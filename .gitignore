@@ -3,3 +3,18 @@ terraform.tfstate.backup
 .terraform
 .terraform.lock.hcl
 
+todo.txt
+
+backend/data
+backend/__pycache__
+backend/*/__pycache__/
+backend/.env
+
+frontend/
+hls_output
+
+.DS_Store
+**/.DS_Store
+
+docker-compose.yml
+nginx.conf
