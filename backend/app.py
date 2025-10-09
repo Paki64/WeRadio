@@ -38,7 +38,7 @@ def create_app():
 
     radio = None
     if STREAMER_MODE:
-        # Streamer node: HLS + FFmpeg
+        # Streamer node: Manages streaming to clients or API-only nodes
         radio = RadioHLS(UPLOAD_FOLDER, HLS_FOLDER)
         init_api_radio(radio)
         init_upload_radio(radio)
@@ -47,9 +47,10 @@ def create_app():
         app.register_blueprint(upload_bp)
         logger.info("Flask application (STREAMER mode) initialized")
     else:
-        # API-only node:
+        # API-only node: Does not handle streaming
         init_api_radio(None)
         init_upload_radio(None)
+        app.register_blueprint(streaming_bp)
         app.register_blueprint(api_bp)
         app.register_blueprint(upload_bp)
         logger.info("Flask application (API-only mode) initialized")
@@ -71,12 +72,9 @@ def main():
     # Display startup info
     mode = "STREAMER mode" if radio else "API-only mode"
     logger.info("=" * 60)
-    logger.info(f"WeRadio Server v0.2 ({mode})")
+    logger.info(f"WeRadio Server v0.3 ({mode})")
     logger.info("=" * 60)
-    
-    if radio:
-        logger.info(f"HLS Playlist: http://localhost:{FLASK_PORT}/playlist.m3u8")
-    
+    logger.info(f"HLS Playlist: http://localhost:{FLASK_PORT}/playlist.m3u8")
     logger.info(f"Status API:   http://localhost:{FLASK_PORT}/status")
     logger.info(f"Tracks API:   http://localhost:{FLASK_PORT}/tracks")
     logger.info(f"Upload API:   http://localhost:{FLASK_PORT}/upload")
