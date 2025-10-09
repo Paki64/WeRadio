@@ -6,7 +6,7 @@ Flask routes for HLS streaming endpoints:
 - /playlist.m3u8 - HLS playlist
 - /hls/<filename> - HLS segments
 
-Version: 0.2
+Version: 0.3
 """
 
 import os
@@ -25,9 +25,6 @@ streaming_bp = Blueprint('streaming', __name__)
 def hls_playlist():
     """
     Serves the HLS playlist file.
-    
-    Returns:
-        Response: M3U8 playlist with modified segment paths
     """
     playlist_path = os.path.join(HLS_FOLDER, 'playlist.m3u8')
     
@@ -87,7 +84,6 @@ def hls_segment(filename):
     Returns:
         Response: The segment file or error
     """
-    # Validate filename to prevent path traversal
     if not validate_filename(filename):
         logger.warning(f"Invalid filename requested: {filename}")
         return jsonify({'error': 'Invalid filename'}), 400

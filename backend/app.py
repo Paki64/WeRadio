@@ -2,7 +2,7 @@
 WeRadio - Main Application Entry Point
 =======================================
 
-Version: 0.2
+Version: 0.3
 """
 
 import logging
@@ -21,8 +21,6 @@ from routes import (
     init_api_radio, init_upload_radio
 )
 
-
-# === LOGGING CONFIGURATION ===
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL),
     format=LOG_FORMAT,
@@ -33,17 +31,10 @@ logger.setLevel(getattr(logging, LOG_LEVEL))
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 
-# === FLASK APPLICATION ===
 def create_app():
-    """
-    Creates and configures the Flask application.
-    
-    Returns:
-        Flask: Configured Flask application instance
-        RadioHLS or None: RadioHLS instance if STREAMER, else None
-    """
+    """Creates and configures the Flask application."""
     app = Flask(__name__)
-    CORS(app) # Enables Cross-Origin Resource Sharing for all routes
+    CORS(app)
 
     radio = None
     if STREAMER_MODE:
@@ -56,7 +47,7 @@ def create_app():
         app.register_blueprint(upload_bp)
         logger.info("Flask application (STREAMER mode) initialized")
     else:
-        # API-only node: no HLS/FFmpeg
+        # API-only node:
         init_api_radio(None)
         init_upload_radio(None)
         app.register_blueprint(api_bp)

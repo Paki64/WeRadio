@@ -6,14 +6,14 @@ Flask routes for API endpoints:
 - /status - Current playback status
 - /tracks - List all available tracks
 
-Version: 0.2
+Version: 0.3
 """
 
 import os
 import logging
 from flask import Blueprint, jsonify, request
-from config import UPLOAD_FOLDER
-from utils import redis_manager
+from config import UPLOAD_FOLDER, OBJECT_STORAGE
+from utils import redis_manager, StorageManager
 
 
 # === Logging Configuration ===
@@ -46,9 +46,6 @@ def init_radio(radio_instance):
 def status():
     """
     API endpoint to get current playback status.
-    
-    Returns:
-        JSON with current track, queue info, and playback time
     """
     # STREAMER mode: use direct data
     if radio:
@@ -102,9 +99,6 @@ def status():
 def tracks():
     """
     Lists all available tracks in the library.
-    
-    Returns:
-        JSON with list of tracks and their metadata
     """
     # If STREAMER node, use direct data
     if radio:
@@ -113,7 +107,6 @@ def tracks():
         with radio.playlist_lock:
             for track in radio.available_tracks:
                 meta = radio._get_track_metadata(track)
-                # filepath is set by _get_track_metadata
                 meta['filename'] = os.path.basename(track)
                 meta['in_queue'] = track in radio.queue
                 track_list.append(meta)
@@ -173,7 +166,6 @@ def remove_track():
     Removes a track from the system completely.
     
     Request body: JSON with 'filepath' field
-    Returns: JSON with success status and message
     """
     data = request.get_json()
     
@@ -183,28 +175,66 @@ def remove_track():
     filepath = data['filepath']
     
     if radio:
+        # STREAMER mode: use radio instance
         result = radio.remove_track(filepath)
         return jsonify(result), 200 if result['success'] else 400
     
-    # API-only mode: delete file and publish reload command
-    full_path = os.path.join(UPLOAD_FOLDER, filepath)
+    # API-only mode: use TrackManager with Redis data
+    from utils import TrackManager
+    from collections import deque
     
-    if not os.path.exists(full_path):
-        return jsonify({'success': False, 'message': 'Track not found'}), 404
+    if not redis_manager.is_connected:
+        return jsonify({'error': 'Redis not available'}), 503
     
-    try:
-        os.remove(full_path)
-        redis_manager.publish_reload_tracks()
-        return jsonify({
-            'success': True,
-            'message': f'Track "{filepath}" deleted successfully'
-        }), 200
-    except Exception as e:
-        logger.error(f"Failed to delete track: {e}")
-        return jsonify({
-            'success': False,
-            'message': f'Failed to delete track: {str(e)}'
-        }), 500
+    # Get available tracks from Redis
+    available_tracks_data = redis_manager.get_available_tracks()
+    available_tracks = [track['filepath'] for track in available_tracks_data]
+    
+    # Get queue from Redis
+    queue_list = redis_manager.get_queue()
+    queue = deque(queue_list)
+    
+    if filepath not in available_tracks:
+        return jsonify({'success': False, 'message': 'Track not in library'}), 404
+    
+    # Use TrackManager to delete
+    storage_manager = StorageManager(use_object_storage=OBJECT_STORAGE)
+    
+    if OBJECT_STORAGE:
+        # Delete from MinIO
+        success, message = TrackManager.delete_track_files(
+            filepath,
+            cache_getter=None,
+            storage_manager=storage_manager,
+            upload_folder=UPLOAD_FOLDER,
+            cache_folder=None,
+            available_tracks=available_tracks,
+            queue=queue
+        )
+    else:
+        # Delete from local filesystem
+        full_path = os.path.join(UPLOAD_FOLDER, filepath)
+        success, message = TrackManager.delete_track_files(
+            full_path,
+            cache_getter=None,
+            storage_manager=None,
+            upload_folder=None,
+            cache_folder=None,
+            available_tracks=available_tracks,
+            queue=queue
+        )
+    
+    if not success:
+        return jsonify({'success': False, 'message': message}), 400
+    
+    # Update Redis
+    redis_manager.remove_from_queue(filepath)
+    redis_manager.publish_reload_tracks()
+    
+    return jsonify({
+        'success': True,
+        'message': f'Track "{os.path.basename(filepath)}" deleted successfully'
+    }), 200
 
 
 @api_bp.route('/queue/remove', methods=['POST'])

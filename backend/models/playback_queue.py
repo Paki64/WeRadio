@@ -4,7 +4,7 @@ WeRadio - Playback Queue Manager
 
 Manages the playback queue for track streaming.
 
-Version: 0.2
+Version: 0.3
 """
 
 import os
@@ -66,9 +66,6 @@ class PlaybackQueue:
     def get_next_track(self):
         """
         Gets and removes the next track from the queue.
-        
-        Returns:
-            str or None: Relative path to next track, or None if queue is empty
         """
         with self.queue_lock:
             if not self.queue:
@@ -84,9 +81,6 @@ class PlaybackQueue:
         
         Args:
             track_path (str): Relative path to the track
-            
-        Returns:
-            tuple: (success: bool, message: str)
         """
         with self.queue_lock:
             success, message = QueueManager.add_track_to_queue(
@@ -103,9 +97,6 @@ class PlaybackQueue:
         
         Args:
             track_path (str): Relative path to the track
-            
-        Returns:
-            tuple: (success: bool, message: str)
         """
         with self.queue_lock:
             success, message = QueueManager.remove_track_from_queue(
@@ -118,9 +109,6 @@ class PlaybackQueue:
     def get_info(self):
         """
         Gets formatted information about the current queue.
-        
-        Returns:
-            dict: Queue information with keys 'queue', 'length', 'next_track'
         """
         with self.queue_lock:
             return QueueManager.get_queue_info(
@@ -134,9 +122,6 @@ class PlaybackQueue:
         
         Args:
             track_path (str): Relative path to check
-            
-        Returns:
-            bool: True if track is in queue
         """
         with self.queue_lock:
             return track_path in self.queue
@@ -156,9 +141,6 @@ class PlaybackQueue:
     def is_empty(self):
         """
         Checks if the queue is empty.
-        
-        Returns:
-            bool: True if queue is empty
         """
         with self.queue_lock:
             return len(self.queue) == 0
@@ -166,9 +148,6 @@ class PlaybackQueue:
     def get_length(self):
         """
         Returns the current queue length.
-        
-        Returns:
-            int: Number of tracks in queue
         """
         with self.queue_lock:
             return len(self.queue)

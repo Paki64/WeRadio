@@ -4,7 +4,7 @@ WeRadio - Redis Manager
 
 Manages Redis connection and state synchronization between nodes.
 
-Version: 0.2
+Version: 0.3
 """
 
 import json
@@ -77,9 +77,6 @@ class RedisManager:
     def _reconnect(self) -> bool:
         """
         Attempt to reconnect to Redis
-        
-        Returns:
-            bool: True if reconnected successfully
         """
         current_time = time.time()
         
@@ -106,9 +103,9 @@ class RedisManager:
     
     @property
     def is_connected(self) -> bool:
-        """Check if Redis is connected, attempt reconnection if needed."""
+        """Check if Redis is connected without attempting reconnection."""
         if self._redis_client is None:
-            return self._reconnect()
+            return False
         
         try:
             self._redis_client.ping()
@@ -116,7 +113,7 @@ class RedisManager:
         except (redis.ConnectionError, redis.TimeoutError) as e:
             logger.warning(f"Redis connection lost: {e}")
             self._redis_client = None
-            return self._reconnect()
+            return False
         except Exception as e:
             logger.error(f"Redis ping failed: {e}")
             return False
@@ -129,13 +126,16 @@ class RedisManager:
             operation: Redis operation function
             *args, **kwargs: Arguments for the operation
         """
+        # Two attempts: initial and one retry after reconnect
         if not self.is_connected:
-            return None
+            if not self._reconnect():
+                return None
         
         try:
             return operation(*args, **kwargs)
         except (redis.ConnectionError, redis.TimeoutError) as e:
-            logger.warning(f"Redis operation failed, attempting reconnection: {e}")
+            logger.warning(f"Redis operation failed: {e}")
+            self._redis_client = None
             
             if self._reconnect():
                 try:
@@ -203,9 +203,6 @@ class RedisManager:
     def get_playback_time(self) -> float:
         """
         Get current playback time.
-        
-        Returns:
-            Current playback time in seconds
         """
         data = self._execute_with_retry(
             lambda: self._redis_client.get(REDIS_KEY_PLAYBACK_TIME)
@@ -227,9 +224,6 @@ class RedisManager:
         
         Args:
             queue: List of track filepaths
-            
-        Returns:
-            bool: True if successful
         """
         result = self._execute_with_retry(
             lambda: self._redis_client.set(REDIS_KEY_QUEUE, json.dumps(queue), ex=3600)
@@ -239,9 +233,6 @@ class RedisManager:
     def get_queue(self) -> List[str]:
         """
         Get the playback queue.
-        
-        Returns:
-            List of track filepaths
         """
         data = self._execute_with_retry(
             lambda: self._redis_client.get(REDIS_KEY_QUEUE)
@@ -261,9 +252,6 @@ class RedisManager:
         
         Args:
             filepath: Track filepath to add
-            
-        Returns:
-            bool: True if command published
         """
         result = self._execute_with_retry(
             lambda: self._redis_client.publish(
@@ -279,9 +267,6 @@ class RedisManager:
         
         Args:
             filepath: Track filepath to remove
-            
-        Returns:
-            bool: True if command published
         """
         result = self._execute_with_retry(
             lambda: self._redis_client.publish(
@@ -299,9 +284,6 @@ class RedisManager:
         
         Args:
             tracks: List of track metadata dictionaries
-            
-        Returns:
-            bool: True if successful
         """
         result = self._execute_with_retry(
             lambda: self._redis_client.set(REDIS_KEY_AVAILABLE_TRACKS, json.dumps(tracks), ex=3600)
@@ -311,9 +293,6 @@ class RedisManager:
     def get_available_tracks(self) -> List[Dict[str, Any]]:
         """
         Get the list of available tracks.
-        
-        Returns:
-            List of track metadata dictionaries
         """
         data = self._execute_with_retry(
             lambda: self._redis_client.get(REDIS_KEY_AVAILABLE_TRACKS)

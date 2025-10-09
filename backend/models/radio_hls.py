@@ -4,19 +4,18 @@ WeRadio - RadioHLS Coordinator
 
 Main coordinator class that integrates library, queue, and streaming components.
 
-Version: 0.2
-Nota: gestito solo dal nodo streamer
+Version: 0.3
 """
 
 import os
 import logging
 import threading
 
-from config import UPLOAD_FOLDER, HLS_FOLDER
+from config import UPLOAD_FOLDER, HLS_FOLDER, OBJECT_STORAGE
 from .track_library import TrackLibrary
 from .playback_queue import PlaybackQueue
 from .hls_streamer import HLSStreamer
-from utils import redis_manager
+from utils import redis_manager, StorageManager
 
 
 logger = logging.getLogger('WeRadio.RadioHLS')
@@ -32,21 +31,25 @@ class RadioHLS:
     - HLSStreamer: Handles FFmpeg streaming
     """
     
-    def __init__(self, upload_folder=UPLOAD_FOLDER, hls_folder=HLS_FOLDER):
+    def __init__(self, upload_folder=UPLOAD_FOLDER, hls_folder=HLS_FOLDER, storage_manager=None):
         """
         Initializes the HLS radio system.
         
         Args:
             upload_folder (str): Path to folder containing music tracks
             hls_folder (str): Path to output folder for HLS segments
+            storage_manager: Optional StorageManager instance
         """
         self.upload_folder = upload_folder
         self.hls_folder = hls_folder
         
+        # Initialize storage manager
+        self.storage_manager = storage_manager or StorageManager(use_object_storage=OBJECT_STORAGE)
+        
         # Initialize components
-        self.track_library = TrackLibrary(upload_folder)
+        self.track_library = TrackLibrary(upload_folder, storage_manager=self.storage_manager)
         self.playback_queue = PlaybackQueue(self.track_library)
-        self.hls_streamer = HLSStreamer(hls_folder, self.track_library, self.playback_queue)
+        self.hls_streamer = HLSStreamer(hls_folder, self.track_library, self.playback_queue, storage_manager=self.storage_manager)
         
         # Redis synchronization
         self._redis_sync_thread = None
@@ -128,31 +131,23 @@ class RadioHLS:
     def remove_track(self, track_path):
         """
         Removes a track completely: from library, queue, and deletes file.
-        Skips to next track if currently playing.
         
         Args:
             track_path (str): Relative path to the track
-            
-        Returns:
-            dict: Response with 'success' and 'message' keys
         """
         try:
-            # Remove from library
             success, message = self.track_library.remove_track(track_path)
             if not success:
                 return {'success': False, 'message': message}
             
             currently_playing = False
             
-            # Remove from queue if present
             self.playback_queue.remove_from_queue_if_present(track_path)
             
-            # Skip if currently playing
             if self.hls_streamer.is_currently_playing(track_path):
                 currently_playing = True
                 self.hls_streamer.skip_current_track()
             
-            # Refill queue if empty
             self.playback_queue.refill_if_empty()
             
             response_message = 'Track removed successfully'
@@ -171,9 +166,6 @@ class RadioHLS:
         
         Args:
             track_path (str): Relative path to the track
-            
-        Returns:
-            dict: Response with 'success' and 'message' keys
         """
         try:
             success, message = self.playback_queue.remove_track(track_path)
@@ -181,7 +173,6 @@ class RadioHLS:
             if not success:
                 return {'success': False, 'message': message}
             
-            # Refill if queue is empty
             self.playback_queue.refill_if_empty()
             
             return {'success': True, 'message': message}
@@ -216,32 +207,37 @@ class RadioHLS:
         
         while self._redis_sync_running:
             try:
-                # Publish current track metadata
                 if self.current_metadata:
                     redis_manager.set_current_track(self.current_metadata)
                 
-                # Publish playback time
                 current_time = self.get_current_playback_time()
                 redis_manager.set_playback_time(current_time)
                 
-                # Publish queue
                 queue_list = list(self.queue)
                 redis_manager.set_queue(queue_list)
                 
-                # Publish available tracks with metadata
                 tracks_with_meta = []
                 for track in self.available_tracks:
-                    meta = self._get_track_metadata(track)
-                    tracks_with_meta.append(meta)
+                    try:
+                        meta = self._get_track_metadata(track)
+                        tracks_with_meta.append(meta)
+                    except Exception as meta_error:
+                        logger.warning(f"Error getting metadata for {track}: {meta_error}")
+                        tracks_with_meta.append({
+                            'title': track,
+                            'artist': 'Unknown',
+                            'duration': 0,
+                            'filepath': track
+                        })
                 redis_manager.set_available_tracks(tracks_with_meta)
                 
-                # Sleep for 1 second before next update
+                # Sleep before update
                 time.sleep(1)
                 
             except Exception as e:
                 logger.error(f"Error in Redis sync loop: {e}")
-                time.sleep(5)  # Wait longer on error
-    
+                time.sleep(5) 
+
     def _start_redis_command_listener(self):
         """Starts Redis command listener thread."""
         if redis_manager.is_connected:
@@ -291,7 +287,6 @@ class RadioHLS:
                         if action == 'add_to_queue':
                             filepath = command.get('filepath')
                             logger.info(f"Redis command: add_to_queue {filepath}")
-                            # Usa il metodo interno della coda
                             from utils import QueueManager
                             from config import QUEUE_SIZE
                             with self.playlist_lock:

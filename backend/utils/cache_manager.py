@@ -4,7 +4,7 @@ WeRadio - Cache Management Utilities
 
 Utilities for managing caches.
 
-Version: 0.2
+Version: 0.3
 """
 
 import os
@@ -29,20 +29,15 @@ class CacheManager:
             cache_folder (str): Path to the cache folder
             max_size (int): Maximum number of files to keep
             file_pattern (str): Glob pattern for cache files
-            
-        Returns:
-            int: Number of files removed
         """
         try:
             cache_files = list(Path(cache_folder).glob(file_pattern))
             
             if len(cache_files) <= max_size:
                 return 0
-            
-            # Sort by access time (oldest first)
+
             cache_files.sort(key=lambda f: f.stat().st_atime)
             
-            # Calculate how many to remove
             to_remove = len(cache_files) - max_size
             removed_count = 0
             
@@ -72,9 +67,6 @@ class CacheManager:
             cache_dict (dict): The cache dictionary to clean
             max_size (int): Maximum number of entries to keep
             cache_lock (threading.Lock, optional): Lock for thread-safe access
-            
-        Returns:
-            int: Number of entries removed
         """
         try:
             if cache_lock:
@@ -95,14 +87,10 @@ class CacheManager:
         Args:
             cache_dict (dict): The cache dictionary
             max_size (int): Maximum number of entries
-            
-        Returns:
-            int: Number of entries removed
         """
         if len(cache_dict) <= max_size:
             return 0
         
-        # Remove oldest 20% (using insertion order)
         to_remove = len(cache_dict) - max_size
         keys_to_remove = list(cache_dict.keys())[:to_remove]
         
@@ -121,9 +109,6 @@ class CacheManager:
             cache_folder (str, optional): Path to file cache folder
             cache_dict (dict, optional): In-memory cache dictionary
             file_pattern (str): Glob pattern for cache files
-            
-        Returns:
-            dict: Cache statistics
         """
         stats = {}
         
@@ -160,13 +145,9 @@ class CacheManager:
             upload_folder (str): Upload folder path
             metadata_getter (callable): Function to get metadata
             cache_max_size (int): Maximum number of cached files
-            
-        Returns:
-            str: Path to the cached/cleaned file
         """
         from .audio_processor import convert_to_aac
         
-        # .aac files in uploads are already clean
         if filepath.endswith('.aac') and upload_folder in filepath:
             logger.debug(f"File already clean: {os.path.basename(filepath)}")
             return filepath
@@ -183,10 +164,8 @@ class CacheManager:
         
         logger.info(f"Converting audio file to cache: {os.path.basename(filepath)}")
         
-        # Clean cache if needed
         CacheManager.clean_file_cache(cache_folder, cache_max_size)
         
-        # Get metadata and convert
         meta = metadata_getter(filepath)
         success, error = convert_to_aac(filepath, cached_file, meta)
         
@@ -205,9 +184,6 @@ class CacheManager:
         Args:
             filepath (str): Original file path
             cache_folder (str): Cache folder path
-            
-        Returns:
-            str: Path to the cached file (may not exist yet)
         """
         file_hash = hashlib.md5(filepath.encode()).hexdigest()
         return os.path.join(cache_folder, f"{file_hash}.aac")
@@ -220,9 +196,6 @@ class CacheManager:
         Args:
             filepath (str): Original file path
             cache_folder (str): Cache folder path
-            
-        Returns:
-            bool: True if cached version exists
         """
         cached_path = CacheManager.get_cache_path_for_file(filepath, cache_folder)
         return os.path.exists(cached_path)
@@ -235,9 +208,6 @@ class CacheManager:
         Args:
             filepath (str): Original file path
             cache_folder (str): Cache folder path
-            
-        Returns:
-            tuple: (success: bool, message: str)
         """
         try:
             cached_path = CacheManager.get_cache_path_for_file(filepath, cache_folder)
@@ -260,9 +230,6 @@ class CacheManager:
         
         Args:
             cache_folder (str): Path to cache folder
-            
-        Returns:
-            tuple: (success: bool, files_removed: int)
         """
         try:
             cache_files = list(Path(cache_folder).glob('*.aac'))

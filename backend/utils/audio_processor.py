@@ -4,7 +4,7 @@ WeRadio - Audio Processing Utilities
 
 Utilities for audio file processing, metadata extraction, and conversion.
 
-Version: 0.2
+Version: 0.3
 """
 
 import os

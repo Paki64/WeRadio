@@ -4,7 +4,7 @@ WeRadio - HLS Streamer
 
 Manages HLS streaming with FFmpeg.
 
-Version: 0.2
+Version: 0.3
 """
 
 import os
@@ -13,6 +13,7 @@ import logging
 import subprocess
 import shutil
 import threading
+import tempfile
 
 from config import (
     SEGMENT_DURATION, HLS_LIST_SIZE, HLS_CLIENT_BUFFER_DELAY
@@ -33,7 +34,7 @@ class HLSStreamer:
     - Clean up old segments
     """
     
-    def __init__(self, hls_folder, track_library, playback_queue):
+    def __init__(self, hls_folder, track_library, playback_queue, storage_manager=None):
         """
         Initializes the HLS streamer.
         
@@ -41,10 +42,12 @@ class HLSStreamer:
             hls_folder (str): Path to output folder for HLS segments
             track_library (TrackLibrary): Reference to track library
             playback_queue (PlaybackQueue): Reference to playback queue
+            storage_manager: Optional StorageManager instance
         """
         self.hls_folder = hls_folder
         self.track_library = track_library
         self.playback_queue = playback_queue
+        self.storage_manager = storage_manager
         
         # Streaming state
         self.current_segment_number = 0
@@ -109,26 +112,17 @@ class HLSStreamer:
     def get_current_playback_time(self):
         """
         Calculates current playback time with client buffer adjustment.
-        
-        Returns:
-            float: Current time in seconds (adjusted for client delay)
         """
         if self.track_start_time and self.playing:
             elapsed = time.time() - self.track_start_time
             duration = self.current_metadata.get('duration', 0)
-            
-            # Subtract client buffer delay
-            adjusted_time = max(0, elapsed - HLS_CLIENT_BUFFER_DELAY)
-            
+            adjusted_time = max(0, elapsed - HLS_CLIENT_BUFFER_DELAY)    
             return min(adjusted_time, duration) if duration > 0 else adjusted_time
         return 0
     
     def skip_current_track(self):
         """
         Skips the currently playing track.
-        
-        Returns:
-            bool: True if skip was successful
         """
         if self.ffmpeg_process and self.ffmpeg_process.poll() is None:
             self.ffmpeg_process.terminate()
@@ -146,9 +140,6 @@ class HLSStreamer:
         
         Args:
             track_path (str): Relative path to check
-            
-        Returns:
-            bool: True if this track is currently playing
         """
         return (self.ffmpeg_process and 
                 self.ffmpeg_process.poll() is None and
@@ -210,7 +201,6 @@ class HLSStreamer:
                 logger.debug("Playlist not found, skipping cleanup")
                 return
             
-            # Read playlist and extract referenced segments
             with open(playlist_path, 'r') as f:
                 playlist_content = f.read()
             
@@ -220,11 +210,9 @@ class HLSStreamer:
                 if line.startswith('segment_') and line.endswith('.ts'):
                     segments_in_playlist.add(line)
             
-            # Get all segment files on disk
             all_segment_files = set(f for f in os.listdir(self.hls_folder) 
                                    if f.startswith('segment_') and f.endswith('.ts'))
             
-            # Find segments to remove (on disk but not in playlist)
             segments_to_remove = all_segment_files - segments_in_playlist
             
             cleaned_count = 0
@@ -248,10 +236,41 @@ class HLSStreamer:
         Streams a single track using FFmpeg.
         
         Args:
-            track_path (str): Absolute path to the audio file
+            track_path (str): Absolute path to the audio file or minio:// URI
             metadata (dict): Track metadata
         """
+        temp_file = None
         try:
+            # Handle MinIO storage - download to temp file
+            if track_path.startswith('minio://'):
+                if not self.storage_manager:
+                    logger.error("Storage manager not available for MinIO track")
+                    return
+                
+                # Extract relative path
+                rel_path = track_path.replace('minio://', '')
+                logger.info(f"Downloading track from MinIO: {rel_path}")
+                
+                # Create temp file
+                temp_file = tempfile.NamedTemporaryFile(suffix='.aac', delete=False)
+                temp_path = temp_file.name
+                temp_file.close()
+                
+                # Download from MinIO
+                data = self.storage_manager.read_file(
+                    rel_path, 
+                    self.track_library.upload_folder, 
+                    'library'
+                )
+                
+                with open(temp_path, 'wb') as f:
+                    f.write(data)
+                
+                actual_track_path = temp_path
+                logger.debug(f"Downloaded to temporary file: {temp_path}")
+            else:
+                actual_track_path = track_path
+            
             segment_filename = os.path.join(self.hls_folder, 'segment_%03d.ts')
             playlist_filename = os.path.join(self.hls_folder, 'playlist.m3u8')
             ffmpeg_log = os.path.join(self.hls_folder, 'ffmpeg.log')
@@ -263,7 +282,7 @@ class HLSStreamer:
             cmd = [
                 'ffmpeg',
                 '-re',
-                '-i', track_path,
+                '-i', actual_track_path,
                 '-c:a', 'copy',
                 '-f', 'hls',
                 '-hls_time', str(SEGMENT_DURATION),
@@ -302,7 +321,6 @@ class HLSStreamer:
             
             logger.info("Track completed")
             
-            # Small delay
             time.sleep(1.5)
             
             # Update segment counter
@@ -319,3 +337,11 @@ class HLSStreamer:
             import traceback
             logger.error(traceback.format_exc())
             time.sleep(2)
+        finally:
+            # Clean up temporary file if it was created
+            if temp_file and os.path.exists(temp_file.name):
+                try:
+                    os.unlink(temp_file.name)
+                    logger.debug(f"Cleaned up temporary file: {temp_file.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up temp file: {e}")

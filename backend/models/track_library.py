@@ -4,20 +4,23 @@ WeRadio - Track Library Manager
 
 Manages the music track library and metadata operations.
 
-Version: 0.2
+Version: 0.3 - Storage abstraction support
 """
 
 import os
+import io
 import logging
 import threading
+import mutagen
 
 from config import (
     SUPPORTED_FORMATS, CACHE_FOLDER, CACHE_MAX_SIZE,
-    METADATA_CACHE_MAX_SIZE
+    METADATA_CACHE_MAX_SIZE, OBJECT_STORAGE
 )
 from utils import (
     get_metadata, 
-    CacheManager, TrackManager
+    CacheManager, TrackManager, StorageManager,
+    SilenceGenerator, SILENCE_FILENAME
 )
 
 
@@ -35,16 +38,20 @@ class TrackLibrary:
     - Provide audio file caching
     """
     
-    def __init__(self, upload_folder, cache_folder=CACHE_FOLDER):
+    def __init__(self, upload_folder, cache_folder=CACHE_FOLDER, storage_manager=None):
         """
         Initializes the track library.
         
         Args:
             upload_folder (str): Path to folder containing music tracks
             cache_folder (str): Path to cache folder for processed audio
+            storage_manager: Optional StorageManager instance
         """
         self.upload_folder = upload_folder
         self.cache_folder = cache_folder
+        
+        # Storage manager
+        self.storage_manager = storage_manager or StorageManager(use_object_storage=OBJECT_STORAGE)
         
         # Track list
         self.available_tracks = []
@@ -54,21 +61,41 @@ class TrackLibrary:
         self.metadata_lock = threading.Lock()
         
         # Initialize
-        os.makedirs(self.cache_folder, exist_ok=True)
-        os.makedirs(self.upload_folder, exist_ok=True)
+        if not self.storage_manager.use_object_storage:
+            os.makedirs(self.cache_folder, exist_ok=True)
+            os.makedirs(self.upload_folder, exist_ok=True)
+        
         self.load_tracks()
     
     def load_tracks(self):
         """
         Scans the uploads folder and loads all available tracks.
-        
-        Returns:
-            list: List of relative paths to available tracks
+        If the library is empty, creates a silence placeholder file.
         """
         self.available_tracks = TrackManager.load_tracks(
             self.upload_folder, 
-            SUPPORTED_FORMATS
+            SUPPORTED_FORMATS,
+            self.storage_manager
         )
+        
+        # Create silence placeholder as fallback if empty library
+        if len(self.available_tracks) == 0:
+            logger.info("Library is empty, creating silence placeholder")
+            success, silence_file = SilenceGenerator.ensure_silence_exists(
+                self.upload_folder,
+                self.storage_manager
+            )
+            
+            if success:
+                self.available_tracks = TrackManager.load_tracks(
+                    self.upload_folder, 
+                    SUPPORTED_FORMATS,
+                    self.storage_manager
+                )
+                logger.info(f"✓ Silence placeholder created: {silence_file}")
+            else:
+                logger.error("Failed to create silence placeholder")
+        
         logger.info(f"Loaded {len(self.available_tracks)} tracks")
         return self.available_tracks
     
@@ -78,11 +105,14 @@ class TrackLibrary:
         
         Args:
             filepath (str): Relative path to audio file
-            
-        Returns:
-            dict: Metadata with keys 'title', 'artist', 'duration', 'filepath'
         """
-        abs_filepath = os.path.join(self.upload_folder, filepath)
+        if SilenceGenerator.is_silence_file(filepath):
+            return {
+                'title': 'Libreria vuota',
+                'artist': 'WeRadio',
+                'duration': 5.0,
+                'filepath': filepath
+            }
         
         CacheManager.clean_metadata_cache(
             self.metadata_cache, 
@@ -90,9 +120,73 @@ class TrackLibrary:
             self.metadata_lock
         )
         
-        metadata = get_metadata(abs_filepath, self.metadata_cache, self.metadata_lock)
-        metadata['filepath'] = filepath
+        cache_key = f"{self.upload_folder}/{filepath}"
+        with self.metadata_lock:
+            if cache_key in self.metadata_cache:
+                metadata = self.metadata_cache[cache_key].copy()
+                metadata['filepath'] = filepath
+                return metadata
         
+        if self.storage_manager.use_object_storage:
+            try:
+                data = self.storage_manager.read_file(filepath, self.upload_folder, 'library')
+                file_obj = io.BytesIO(data)
+                audio = mutagen.File(file_obj)
+                
+                if audio is None:
+                    metadata = {
+                        'title': filepath,
+                        'artist': 'Unknown',
+                        'duration': 0
+                    }
+                else:
+                    title = None
+                    artist = None
+                    
+                    # Common tag formats
+                    title_tags = ['title', 'TIT2', '\xa9nam']
+                    artist_tags = ['artist', 'TPE1', '\xa9ART']
+                    
+                    for tag_key in title_tags:
+                        if tag_key in audio:
+                            value = audio[tag_key]
+                            title = str(value[0]) if isinstance(value, list) else str(value)
+                            break
+                    
+                    for tag_key in artist_tags:
+                        if tag_key in audio:
+                            value = audio[tag_key]
+                            artist = str(value[0]) if isinstance(value, list) else str(value)
+                            break
+                    
+                    if not title or title.strip() == '':
+                        title = filepath
+                    if not artist or artist.strip() == '':
+                        artist = 'Unknown'
+                    
+                    duration = audio.info.length if hasattr(audio.info, 'length') else 0
+                    
+                    metadata = {
+                        'title': title,
+                        'artist': artist,
+                        'duration': float(duration)
+                    }
+                
+                with self.metadata_lock:
+                    self.metadata_cache[cache_key] = metadata
+                
+            except Exception as e:
+                logger.error(f"Error reading metadata from MinIO for {filepath}: {e}")
+                metadata = {
+                    'title': filepath,
+                    'artist': 'Unknown',
+                    'duration': 0
+                }
+        else:
+            abs_filepath = os.path.join(self.upload_folder, filepath)
+            metadata = get_metadata(abs_filepath, self.metadata_cache, self.metadata_lock)
+        
+        metadata['filepath'] = filepath
         return metadata
     
     def get_clean_audio(self, filepath):
@@ -101,19 +195,19 @@ class TrackLibrary:
         
         Args:
             filepath (str): Relative file path
-            
-        Returns:
-            str: Absolute path to cleaned/cached file
         """
-        abs_filepath = os.path.join(self.upload_folder, filepath)
-        
-        return CacheManager.get_cached_audio(
-            abs_filepath,
-            self.cache_folder,
-            self.upload_folder,
-            lambda fp: get_metadata(fp, self.metadata_cache, self.metadata_lock),
-            CACHE_MAX_SIZE
-        )
+        if self.storage_manager.use_object_storage:
+            return f"minio://{filepath}"
+        else:
+            abs_filepath = os.path.join(self.upload_folder, filepath)
+            
+            return CacheManager.get_cached_audio(
+                abs_filepath,
+                self.cache_folder,
+                self.upload_folder,
+                lambda fp: get_metadata(fp, self.metadata_cache, self.metadata_lock),
+                CACHE_MAX_SIZE
+            )
     
     def remove_track(self, track_path):
         """
@@ -121,28 +215,54 @@ class TrackLibrary:
         
         Args:
             track_path (str): Relative path to the track
-            
-        Returns:
-            tuple: (success: bool, message: str)
         """
-        # Validate track
+        if SilenceGenerator.is_silence_file(track_path):
+            return {
+                'success': False, 
+                'message': 'Cannot delete the silence placeholder. Upload a real track first.'
+            }
+        
         is_valid, error = TrackManager.validate_track_path(track_path, self.available_tracks)
         if not is_valid:
-            return False, error
+            return {'success': False, 'message': error}
         
-        # Remove from library
-        TrackManager.remove_from_library(self.available_tracks, track_path)
+        success, message = TrackManager.remove_from_library(self.available_tracks, track_path)
+        if not success:
+            return {'success': False, 'message': message}
+        
         logger.info(f"Removed from library: {os.path.basename(track_path)}")
         
         # Delete files
-        abs_track_path = os.path.join(self.upload_folder, track_path)
-        TrackManager.delete_track_files(abs_track_path, lambda fp: self.get_clean_audio(track_path))
+        if self.storage_manager.use_object_storage:
+            # Delete from MinIO
+            success, message = TrackManager.delete_track_files(
+                track_path,
+                lambda fp: self.get_clean_audio(track_path),
+                storage_manager=self.storage_manager,
+                upload_folder=self.upload_folder,
+                cache_folder=self.cache_folder,
+                available_tracks=self.available_tracks,
+                queue=self.queue
+            )
+            if not success:
+                return {'success': False, 'message': message}
+        else:
+            # Delete from local filesystem
+            abs_track_path = os.path.join(self.upload_folder, track_path)
+            success, message = TrackManager.delete_track_files(
+                abs_track_path, 
+                lambda fp: self.get_clean_audio(track_path),
+                available_tracks=self.available_tracks,
+                queue=self.queue
+            )
+            if not success:
+                return {'success': False, 'message': message}
         
-        # Clean metadata cache
+        cache_key = f"{self.upload_folder}/{track_path}"
         with self.metadata_lock:
-            self.metadata_cache.pop(abs_track_path, None)
+            self.metadata_cache.pop(cache_key, None)
         
-        return True, "Track removed from library"
+        return {'success': True, 'message': 'Track removed from library'}
     
     def is_track_in_library(self, track_path):
         """
@@ -150,17 +270,42 @@ class TrackLibrary:
         
         Args:
             track_path (str): Relative path to check
-            
-        Returns:
-            bool: True if track is in library
         """
         return track_path in self.available_tracks
     
     def get_track_count(self):
         """
         Returns the number of tracks in the library.
-        
-        Returns:
-            int: Number of tracks
         """
         return len(self.available_tracks)
+    
+    def remove_silence_if_exists(self):
+        """
+        Removes the silence placeholder file if it exists.
+        Should be called when a real track is added to the library.
+        """
+        if SILENCE_FILENAME in self.available_tracks:
+            logger.info("Removing silence placeholder (real track added)")
+            
+            success = SilenceGenerator.remove_silence_file(
+                self.upload_folder,
+                self.storage_manager
+            )
+            
+            if success:
+                self.available_tracks = [
+                    track for track in self.available_tracks 
+                    if track != SILENCE_FILENAME
+                ]
+                
+                cache_key = f"{self.upload_folder}/{SILENCE_FILENAME}"
+                with self.metadata_lock:
+                    self.metadata_cache.pop(cache_key, None)
+                
+                logger.info("✓ Silence placeholder removed successfully")
+                return True
+            else:
+                logger.error("Failed to remove silence placeholder file")
+                return False
+        
+        return True

@@ -4,7 +4,7 @@ WeRadio - File Validation Utilities
 
 Security utilities for validating file paths and filenames.
 
-Version: 0.2
+Version: 0.3
 """
 
 import os
@@ -21,9 +21,6 @@ def validate_file_path(filepath, base_folder):
     Args:
         filepath (str): The file path to validate
         base_folder (str): The base folder that the file must be within
-        
-    Returns:
-        tuple: (bool, str, str) - (is_valid, error_message, relative_path)
     """
     try:
         # Unallowed characters check
@@ -89,14 +86,6 @@ def validate_file_extension(filename, allowed_extensions):
     Args:
         filename (str): The filename to check
         allowed_extensions (set): Set of allowed extensions (e.g., {'.mp3', '.flac'})
-        
-    Returns:
-        bool: True if extension is allowed, False otherwise
-        
-    Example:
-        allowed = {'.mp3', '.flac', '.wav'}
-        if validate_file_extension('song.mp3', allowed):
-            print("Valid audio file!")
     """
     ext = os.path.splitext(filename)[1].lower()
     return ext in allowed_extensions
@@ -108,13 +97,6 @@ def sanitize_filename(filename):
     
     Args:
         filename (str): The filename to sanitize
-        
-    Returns:
-        str: Sanitized filename
-        
-    Example:
-        clean = sanitize_filename('my/../song.mp3')
-        # Returns: 'my_song.mp3'
     """
     # Replace dangerous characters with underscores
     dangerous_chars = ['..', '/', '\\', '\0']

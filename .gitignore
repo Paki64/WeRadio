@@ -5,16 +5,32 @@ terraform.tfstate.backup
 
 todo.txt
 
+# Backend data directories
 backend/data
 backend/__pycache__
 backend/*/__pycache__/
 backend/.env
 
+# MinIO data
+minio/
+postgres/
+redis/
+
+# Frontend (if generated)
 frontend/
 hls_output
 
+# System files
 .DS_Store
 **/.DS_Store
 
+# Docker and configuration files
 docker-compose.yml
 nginx.conf
+dockers.txt
+
+# Temporary files
+*.tmp
+*.temp
+temp_*
+*.pyc

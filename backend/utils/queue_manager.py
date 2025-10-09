@@ -5,7 +5,7 @@ WeRadio - Queue Management Utilities
 Utilities for managing playback queue operations.
 Handles queue initialization, refilling, and track selection.
 
-Version: 0.2
+Version: 0.3
 """
 
 import logging
@@ -28,9 +28,6 @@ class QueueManager:
         
         Args:
             available_tracks (list): List of available track paths
-            
-        Returns:
-            deque: New queue with initial track, or empty if no tracks available
         """
         queue = deque()
         
@@ -78,14 +75,11 @@ class QueueManager:
         Args:
             queue (deque): The current queue
             metadata_getter (callable): Function to get metadata for a track
-            
-        Returns:
-            dict: Queue information with keys 'queue', 'length', 'next_track'
         """
         queue_list = []
         for track in queue:
             meta = metadata_getter(track)
-            display_name = f"{meta['artist']} - {meta['title']}" if meta['title'] != 'Unknown' else os.path.basename(track)
+            display_name = f"{meta['artist']} - {meta['title']}"
             queue_list.append(display_name)
         
         next_track_info = metadata_getter(list(queue)[0]) if queue else None
@@ -106,23 +100,16 @@ class QueueManager:
             track_path (str): Path to the track to add
             available_tracks (list): List of available tracks
             max_queue_size (int): Maximum allowed queue size
-            
-        Returns:
-            tuple: (success: bool, message: str)
         """
-        # Check queue limit
         if len(queue) >= max_queue_size:
             return False, f"Queue is full (max: {max_queue_size})"
         
-        # Verify track exists in library
         if track_path not in available_tracks:
             return False, "Track not in library"
         
-        # Avoid duplicates
         if track_path in queue:
             return False, "Track already in queue"
         
-        # Add to front of queue (will play next)
         queue.appendleft(track_path)
         logger.info(f"Added to queue: {os.path.basename(track_path)}")
         
@@ -137,9 +124,6 @@ class QueueManager:
             queue (deque): The current queue
             track_path (str): Path to the track to remove
             available_tracks (list): List of available tracks
-            
-        Returns:
-            tuple: (success: bool, message: str)
         """
         if track_path not in available_tracks:
             return False, "Track not in library"
