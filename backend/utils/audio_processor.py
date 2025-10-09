@@ -4,7 +4,7 @@ WeRadio - Audio Processing Utilities
 
 Utilities for audio file processing, metadata extraction, and conversion.
 
-Version: 0.1
+Version: 0.2
 """
 
 import os
@@ -27,9 +27,6 @@ def get_metadata(filepath, metadata_cache=None, metadata_lock=None):
         filepath (str): Path to the audio file
         metadata_cache (dict): Cache dictionary for metadata
         metadata_lock (threading.Lock): Lock for thread-safe cache access
-        
-    Returns:
-        dict: Dictionary with keys 'title', 'artist', 'duration'
     """
     # Cache check
     if metadata_cache is not None and metadata_lock is not None:
@@ -52,7 +49,6 @@ def get_metadata(filepath, metadata_cache=None, metadata_lock=None):
                     metadata_cache[filepath] = metadata
             return metadata
         
-        # Try different tag formats
         title = None
         artist = None
         
@@ -86,7 +82,7 @@ def get_metadata(filepath, metadata_cache=None, metadata_lock=None):
             'duration': float(duration)
         }
         
-        # Thread-safe cache update
+        # Cache update
         if metadata_cache is not None and metadata_lock is not None:
             with metadata_lock:
                 metadata_cache[filepath] = metadata
@@ -112,9 +108,6 @@ def clean_metadata_from_filename(filename):
     
     Args:
         filename (str): The filename to clean
-        
-    Returns:
-        str: Fallback title
     """
     clean_title = os.path.splitext(filename)[0]
     clean_title = clean_title.replace('_', ' ').replace('temp_', '').strip()
@@ -135,9 +128,6 @@ def convert_to_aac(input_path, output_path, metadata, bitrate='128k',
         sample_rate (str): Sample rate in Hz (default: '44100')
         channels (str): Number of audio channels (default: '2')
         timeout (int): Conversion timeout in seconds (default: 120)
-        
-    Returns:
-        tuple: (bool, str) - (success, error_message)
     """
     try:
         cmd = [

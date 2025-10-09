@@ -4,7 +4,7 @@ WeRadio - Track Management Utilities
 
 Utilities for managing music track files.
 
-Version: 0.1
+Version: 0.2
 """
 
 import os

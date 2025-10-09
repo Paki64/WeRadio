@@ -2,7 +2,7 @@
 WeRadio - Models Package Initializer
 =====================================
 
-Version: 0.1
+Version: 0.2
 """
 
 from .radio_hls import RadioHLS

@@ -2,7 +2,7 @@
 WeRadio - Package Initializer
 ====================================
 
-Version: 0.1
+Version: 0.2
 """
 
 from .audio_processor import (
@@ -20,6 +20,7 @@ from .file_validator import (
 from .cache_manager import CacheManager
 from .queue_manager import QueueManager
 from .track_manager import TrackManager
+from .redis_manager import redis_manager
 
 __all__ = [
     # Audio processing
@@ -40,4 +41,7 @@ __all__ = [
     
     # Track management
     'TrackManager',
+    
+    # Redis management
+    'redis_manager',
 ]

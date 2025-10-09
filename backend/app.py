@@ -2,7 +2,7 @@
 WeRadio - Main Application Entry Point
 =======================================
 
-Version: 0.1
+Version: 0.2
 """
 
 import logging
@@ -12,7 +12,8 @@ from flask_cors import CORS
 from config import (
     UPLOAD_FOLDER, HLS_FOLDER,
     FLASK_HOST, FLASK_PORT, FLASK_DEBUG, FLASK_THREADED,
-    LOG_LEVEL, LOG_FORMAT, LOG_DATE_FORMAT
+    LOG_LEVEL, LOG_FORMAT, LOG_DATE_FORMAT,
+    STREAMER_MODE
 )
 from models import RadioHLS
 from routes import (
@@ -39,24 +40,29 @@ def create_app():
     
     Returns:
         Flask: Configured Flask application instance
+        RadioHLS or None: RadioHLS instance if STREAMER, else None
     """
     app = Flask(__name__)
     CORS(app) # Enables Cross-Origin Resource Sharing for all routes
-    
-    # Initialize RadioHLS
-    radio = RadioHLS(UPLOAD_FOLDER, HLS_FOLDER) # Create RadioHLS instance
-    
-    # Initialize route modules with radio instance
-    init_api_radio(radio)
-    init_upload_radio(radio)
-    
-    # Register blueprints
-    app.register_blueprint(streaming_bp)
-    app.register_blueprint(api_bp)
-    app.register_blueprint(upload_bp)
-    
-    logger.info("Flask application initialized")
-    
+
+    radio = None
+    if STREAMER_MODE:
+        # Streamer node: HLS + FFmpeg
+        radio = RadioHLS(UPLOAD_FOLDER, HLS_FOLDER)
+        init_api_radio(radio)
+        init_upload_radio(radio)
+        app.register_blueprint(streaming_bp)
+        app.register_blueprint(api_bp)
+        app.register_blueprint(upload_bp)
+        logger.info("Flask application (STREAMER mode) initialized")
+    else:
+        # API-only node: no HLS/FFmpeg
+        init_api_radio(None)
+        init_upload_radio(None)
+        app.register_blueprint(api_bp)
+        app.register_blueprint(upload_bp)
+        logger.info("Flask application (API-only mode) initialized")
+
     return app, radio
 
 
@@ -66,20 +72,25 @@ def main():
     Main application entry point.
     """
     app, radio = create_app()
+
+    # Start streaming if STREAMER node
+    if radio:
+        radio.start_streaming()
     
-    # Start radio streaming
-    radio.start_streaming()
+    # Display startup info
+    mode = "STREAMER mode" if radio else "API-only mode"
+    logger.info("=" * 60)
+    logger.info(f"WeRadio Server v0.2 ({mode})")
+    logger.info("=" * 60)
     
-    # Print banner
-    logger.info("=" * 60)
-    logger.info("WeRadio Server v0.1")
-    logger.info("=" * 60)
-    logger.info(f"HLS Playlist: http://localhost:{FLASK_PORT}/playlist.m3u8")
+    if radio:
+        logger.info(f"HLS Playlist: http://localhost:{FLASK_PORT}/playlist.m3u8")
+    
     logger.info(f"Status API:   http://localhost:{FLASK_PORT}/status")
     logger.info(f"Tracks API:   http://localhost:{FLASK_PORT}/tracks")
     logger.info(f"Upload API:   http://localhost:{FLASK_PORT}/upload")
     logger.info("=" * 60)
-    
+
     # Start Flask server
     try:
         app.run(
@@ -90,12 +101,14 @@ def main():
         )
     except KeyboardInterrupt:
         logger.info("Shutting down...")
-        radio.stop()
+        if radio:
+            radio.stop()
     except Exception as e:
         logger.error(f"Server error: {e}")
-        radio.stop()
+        if radio:
+            radio.stop()
 
 
-# Main execution
+# Main thread
 if __name__ == '__main__':
     main()

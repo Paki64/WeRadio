@@ -10,8 +10,10 @@ Configuration can be overridden via environment variables:
 - WERADIO_HOST: Server host (default: 0.0.0.0)
 - WERADIO_QUEUE_SIZE: Queue size (default: 100)
 - WERADIO_DEBUG: Debug mode (default: False)
+- STREAMER: Enable streamer mode with HLS/FFmpeg (default: true)
+            Set to "false" for API-only nodes in HPA deployments
 
-Version: 0.1
+Version: 0.2
 """
 
 import os
@@ -46,6 +48,24 @@ FLASK_HOST = os.getenv('WERADIO_HOST', '0.0.0.0')
 FLASK_PORT = int(os.getenv('WERADIO_PORT', '5000'))
 FLASK_DEBUG = os.getenv('WERADIO_DEBUG', 'False').lower() in ('true', '1', 'yes')
 FLASK_THREADED = True
+
+# === ARCHITECTURE MODE ===
+# - true  = Streamer node
+# - false = API-only node
+STREAMER_MODE = os.getenv('STREAMER', 'true').lower() in ('true', '1', 'yes')
+
+# === REDIS SETTINGS ===
+# Redis is used to share state between streamer and API nodes
+REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
+REDIS_DB = int(os.getenv('REDIS_DB', '0'))
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', None)
+REDIS_DECODE_RESPONSES = True
+# Redis keys
+REDIS_KEY_CURRENT_TRACK = 'weradio:current_track'
+REDIS_KEY_QUEUE = 'weradio:queue'
+REDIS_KEY_AVAILABLE_TRACKS = 'weradio:available_tracks'
+REDIS_KEY_PLAYBACK_TIME = 'weradio:playback_time'
 
 # === LOGGING SETTINGS ===
 LOG_LEVEL = os.getenv('WERADIO_LOG_LEVEL', 'INFO').upper()

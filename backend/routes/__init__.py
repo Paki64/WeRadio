@@ -2,7 +2,7 @@
 WeRadio - Routes Package Initializer
 =====================================
 
-Version: 0.1
+Version: 0.2
 """
 
 from .streaming import streaming_bp

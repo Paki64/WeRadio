@@ -6,7 +6,7 @@ Flask routes for HLS streaming endpoints:
 - /playlist.m3u8 - HLS playlist
 - /hls/<filename> - HLS segments
 
-Version: 0.1
+Version: 0.2
 """
 
 import os

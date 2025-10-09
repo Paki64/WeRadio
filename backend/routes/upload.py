@@ -6,7 +6,7 @@ Flask routes for file upload and queue management:
 - /upload - Upload new tracks
 - /queue/add - Add track to playback queue
 
-Version: 0.1
+Version: 0.2 - Redis integration for API nodes
 """
 
 import os
@@ -23,7 +23,7 @@ from config import (
 from utils import (
     validate_file_path, validate_filename, validate_file_extension,
     clean_metadata_from_filename, convert_to_aac,
-    QueueManager
+    QueueManager, redis_manager, get_metadata
 )
 
 logger = logging.getLogger('WeRadio.Routes.Upload')
@@ -50,17 +50,10 @@ def add_to_queue():
     """
     Adds a specific track to the playback queue.
     
-    Expected JSON:
-        {
-            "filepath": "/path/to/track.mp3"
-        }
+    Expected JSON: {"filepath": "/path/to/track.mp3"}
     
-    Returns:
-        JSON with success status and metadata
+    Returns: JSON with success status and metadata
     """
-    if not radio:
-        return jsonify({'error': 'Radio not initialized'}), 500
-    
     data = request.get_json()
     
     if not data or 'filepath' not in data:
@@ -68,34 +61,46 @@ def add_to_queue():
     
     filepath = data['filepath']
     
-    # Validate file path securely
-    is_valid, error_msg, rel_filepath = validate_file_path(filepath, radio.upload_folder)
-    if not is_valid:
-        logger.warning(f"Invalid path: {filepath} - {error_msg}")
-        status_code = 403 if error_msg == "Invalid file path" else 404
-        return jsonify({'error': error_msg}), status_code
-    
-    # Add to queue using QueueManager
-    with radio.playlist_lock:
-        success, message = QueueManager.add_track_to_queue(
-            radio.queue,
-            rel_filepath,
-            radio.available_tracks,
-            QUEUE_SIZE
-        )
+    if radio:
+        # STREAMER mode: add directly to queue
+        is_valid, error_msg, rel_filepath = validate_file_path(filepath, radio.upload_folder)
+        if not is_valid:
+            logger.warning(f"Invalid path: {filepath} - {error_msg}")
+            status_code = 403 if error_msg == "Invalid file path" else 404
+            return jsonify({'error': error_msg}), status_code
         
-        if not success:
-            status_code = 507 if 'full' in message else 400
-            return jsonify({'error': message}), status_code
+        with radio.playlist_lock:
+            success, message = QueueManager.add_track_to_queue(
+                radio.queue, rel_filepath, radio.available_tracks, QUEUE_SIZE
+            )
+            
+            if not success:
+                status_code = 507 if 'full' in message else 400
+                return jsonify({'error': message}), status_code
+        
+        meta = radio._get_track_metadata(rel_filepath)
+        logger.info(f"Added to queue: {meta['artist']} - {meta['title']}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Added "{meta["artist"]} - {meta["title"]}" as next track',
+            'metadata': meta,
+            'queue_length': len(radio.queue)
+        })
     
-    meta = radio._get_track_metadata(rel_filepath)
-    logger.info(f"Added to queue: {meta['artist']} - {meta['title']}")
+    # API-only mode: publish command via Redis
+    logger.info(f"API node: Publishing add_to_queue command for {filepath}")
+    redis_manager.add_to_queue(filepath)
+    
+    # Get metadata from Redis
+    available_tracks = redis_manager.get_available_tracks()
+    meta = next((t for t in available_tracks if t.get('filepath') == filepath), 
+                {'title': filepath, 'artist': 'Unknown', 'duration': 0})
     
     return jsonify({
         'success': True,
-        'message': f'Added "{meta["artist"]} - {meta["title"]}" as next track',
-        'metadata': meta,
-        'queue_length': len(radio.queue)
+        'message': f'Command sent to add "{meta.get("artist", "Unknown")} - {meta.get("title", filepath)}" to queue',
+        'metadata': meta
     })
 
 
@@ -108,9 +113,6 @@ def upload():
     Returns:
         JSON with success status and track metadata
     """
-    if not radio:
-        return jsonify({'error': 'Radio not initialized'}), 500
-    
     # Check if file is in request
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
@@ -155,17 +157,11 @@ def upload():
     try:
         # Extract metadata from uploaded file
         try:
-            # Get relative path for metadata
-            rel_temp_path = os.path.relpath(temp_filepath, UPLOAD_FOLDER)
-            meta_before = radio._get_track_metadata(rel_temp_path)
+            meta_before = get_metadata(temp_filepath)
             logger.debug(f"Original metadata: {meta_before['artist']} - {meta_before['title']}")
         except Exception as e:
             logger.error(f"Error reading metadata: {e}")
-            meta_before = {
-                'title': temp_filename,
-                'artist': 'Unknown',
-                'duration': 0
-            }
+            meta_before = {'title': temp_filename, 'artist': 'Unknown', 'duration': 0}
         
         # Clean metadata if missing
         if not meta_before['title'] or meta_before['title'] in [temp_filename, 'Unknown', '']:
@@ -211,12 +207,15 @@ def upload():
         
         logger.info(f"Conversion completed: {final_filename}")
         
-        # Reload available tracks
-        radio.load_available_tracks()
+        # Reload available tracks and get final metadata
+        if radio:
+            radio.load_available_tracks()
+            rel_final_path = os.path.relpath(final_filepath, UPLOAD_FOLDER)
+            meta_after = radio._get_track_metadata(rel_final_path)
+        else:
+            redis_manager.publish_reload_tracks()
+            meta_after = get_metadata(final_filepath)
         
-        # Get final metadata
-        rel_final_path = os.path.relpath(final_filepath, UPLOAD_FOLDER)
-        meta_after = radio._get_track_metadata(rel_final_path)
         logger.info(f"Final metadata: {meta_after['artist']} - {meta_after['title']}")
         
         return jsonify({

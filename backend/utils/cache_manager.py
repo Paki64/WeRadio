@@ -2,9 +2,9 @@
 WeRadio - Cache Management Utilities
 ====================================
 
-Utilities for managing caches (audio files and metadata).
+Utilities for managing caches.
 
-Version: 0.1
+Version: 0.2
 """
 
 import os

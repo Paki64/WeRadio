@@ -4,7 +4,7 @@ WeRadio - Track Library Manager
 
 Manages the music track library and metadata operations.
 
-Version: 0.1
+Version: 0.2
 """
 
 import os

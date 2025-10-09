@@ -4,7 +4,7 @@ WeRadio - File Validation Utilities
 
 Security utilities for validating file paths and filenames.
 
-Version: 0.1
+Version: 0.2
 """
 
 import os

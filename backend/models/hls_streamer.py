@@ -4,7 +4,7 @@ WeRadio - HLS Streamer
 
 Manages HLS streaming with FFmpeg.
 
-Version: 0.1
+Version: 0.2
 """
 
 import os

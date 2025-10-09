@@ -4,7 +4,7 @@ WeRadio - Playback Queue Manager
 
 Manages the playback queue for track streaming.
 
-Version: 0.1
+Version: 0.2
 """
 
 import os
