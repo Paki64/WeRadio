@@ -17,7 +17,11 @@ postgres/
 redis/
 
 # Frontend 
-
+frontend/node_modules
+frontend/.env
+frontend/images
+frontend/favicon.ico
+frontend/favicon.svg
 
 # Data
 data

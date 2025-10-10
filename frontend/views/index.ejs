@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="alternate icon" href="/favicon.ico">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="/js/translations.js"></script>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="radio-container">
+        <div class="logo">
+            <div class="logo-header">
+                <div class="logo-banner">
+                    <img src="/images/banner.svg" alt="WeRadio Banner" 
+                         onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block';" 
+                         onload="document.getElementById('logo-fallback').style.display='none';" />
+                    <h1 id="logo-fallback">📻 <%= t('app_title') %></h1>
+                </div>
+                <button class="settings-btn" onclick="showSettings()" title="<%= t('settings_tooltip') %>"><%= t('settings_button') %></button>
+            </div>
+            <p><%= t('app_subtitle') %></p>
+        </div>
+
+        <div class="auth-section">
+        </div>
+
+        <div class="now-playing">
+            <h2 id="track-title"><%= t('loading') %></h2>
+            <div class="artist" id="track-artist">-</div>
+            <div class="track-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="next-track" id="nextTrack" style="display: none;">
+            <strong><%= t('next_track') %></strong>
+            <div class="next-title" id="next-track-info">-</div>
+        </div>
+
+        <div class="status" id="status">
+            <%= t('click_to_start') %>
+        </div>
+
+        <div class="controls">
+            <button class="play-btn" id="playBtn" onclick="togglePlay()" style="animation: pulse 2s infinite;">
+                <%= t('play_button') %>
+            </button>
+        </div>
+
+        <div class="volume-control">
+            <label for="volume"><%= t('volume_label') %></label>
+            <input type="range" id="volume" min="0" max="100" value="70" oninput="setVolume(this.value)">
+        </div>
+
+        <div class="tracks-section">
+            <h3>
+                <%= t('tracks_section_title') %>
+                <button class="toggle-btn" onclick="showTracksModal()" id="toggleTracksBtn"><%= t('show_tracks_button') %></button>
+            </h3>
+        </div>
+
+        <div class="upload-section">
+            <h3><%= t('upload_section_title') %></h3>
+            <div class="upload-form">
+                <div class="file-input-wrapper">
+                    <input type="file" id="audioFile" accept=".mp3,.flac,.ogg,.wav" onchange="handleFileSelect(event)">
+                    <label for="audioFile" class="file-input-label" id="fileLabel">
+                        <%= t('choose_file') %>
+                    </label>
+                </div>
+                <button class="upload-btn" id="uploadBtn" onclick="uploadFile()" disabled>
+                    <%= t('upload_button') %>
+                </button>
+            </div>
+        </div>
+
+        <div class="queue-section">
+            <h3><%= t('queue_section_title') %></h3>
+            <div class="queue-list" id="queueList">
+                <div class="loading"><%= t('loading_queue') %></div>
+            </div>
+        </div>
+    </div>
+
+    <video id="audio" style="display: none;"></video>
+
+    <!-- Tracks Library Modal -->
+    <div class="tracks-modal" id="tracksModal">
+        <div class="tracks-dialog">
+            <h3><%= t('tracks_modal_title') %></h3>
+            <div class="tracks-list" id="tracksList">
+                <div class="loading"><%= t('loading_tracks') %></div>
+            </div>
+            <div class="tracks-actions">
+                <button class="tracks-close-btn" onclick="hideTracksModal()"><%= t('close_button') %></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Dialog -->
+    <div class="confirm-overlay" id="confirmOverlay">
+        <div class="confirm-dialog">
+            <h3 id="confirmTitle"><%= t('confirm_title') %></h3>
+            <p id="confirmMessage"></p>
+            <div class="confirm-buttons">
+                <button class="confirm-btn confirm-btn-cancel" onclick="closeConfirmDialog(false)"><%= t('cancel_button') %></button>
+                <button class="confirm-btn confirm-btn-confirm" id="confirmBtn" onclick="closeConfirmDialog(true)"><%= t('confirm_button') %></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Authentication Modal -->
+    <div class="auth-modal" id="authModal">
+        <div class="auth-dialog">
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchAuthTab('login')"><%= t('login_tab') %></button>
+                <button class="auth-tab" onclick="switchAuthTab('register')"><%= t('register_tab') %></button>
+            </div>
+
+            <!-- Login Form -->
+            <form class="auth-form active" id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="loginUsername"><%= t('username_label') %></label>
+                    <input type="text" id="loginUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword"><%= t('password_label') %></label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <button type="submit" class="auth-submit-btn" id="loginSubmitBtn"><%= t('login_button_text') %></button>
+                <div id="loginMessage"></div>
+            </form>
+
+            <!-- Register Form -->
+            <form class="auth-form" id="registerForm" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label for="registerUsername"><%= t('username_label') %></label>
+                    <input type="text" id="registerUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerEmail"><%= t('email_label') %></label>
+                    <input type="email" id="registerEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword"><%= t('password_label') %></label>
+                    <input type="password" id="registerPassword" required minlength="6">
+                </div>
+                <button type="submit" class="auth-submit-btn" id="registerSubmitBtn"><%= t('register_button_text') %></button>
+                <div id="registerMessage"></div>
+            </form>
+
+            <div class="auth-switch">
+                <span id="authSwitchText"><%= t('no_account') %></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="settings-modal" id="settingsModal">
+        <div class="settings-dialog">
+            <h3><%= t('settings_title') %></h3>
+            
+            <div class="settings-info">
+                <div class="radio-info">
+                    <strong id="radioName">WeRadio</strong>
+                    <small id="apiVersion">v0.4</small>
+                </div>
+            </div>
+
+            <!-- Settings for logged in users -->
+            <div id="settingsLoggedIn">
+                <div class="settings-section">
+                    <h4><%= t('account_section') %></h4>
+                    <button class="settings-action-btn" onclick="showChangeCredentials()"><%= t('change_credentials_button') %></button>
+                    <button class="settings-action-btn logout-btn" onclick="logout()"><%= t('logout_button') %></button>
+                </div>
+            </div>
+
+            <!-- Login/Register for non-logged users -->
+            <div id="settingsAuth" style="display: none;">
+                <div class="settings-auth-section">
+                    <div class="settings-auth-tabs">
+                        <button class="settings-auth-tab active" onclick="switchSettingsAuthTab('login')"><%= t('login_tab') %></button>
+                        <button class="settings-auth-tab" onclick="switchSettingsAuthTab('register')"><%= t('register_tab') %></button>
+                    </div>
+
+                    <!-- Login Form -->
+                    <form class="settings-auth-form active" id="settingsLoginForm" onsubmit="handleSettingsLogin(event)">
+                        <div class="form-group">
+                            <label for="settingsLoginUsername"><%= t('username_label') %></label>
+                            <input type="text" id="settingsLoginUsername" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsLoginPassword"><%= t('password_label') %></label>
+                            <input type="password" id="settingsLoginPassword" required>
+                        </div>
+                        <button type="submit" class="settings-auth-submit-btn" id="settingsLoginSubmitBtn"><%= t('login_button_text') %></button>
+                        <div id="settingsLoginMessage"></div>
+                    </form>
+
+                    <!-- Register Form -->
+                    <form class="settings-auth-form" id="settingsRegisterForm" onsubmit="handleSettingsRegister(event)">
+                        <div class="form-group">
+                            <label for="settingsRegisterUsername"><%= t('username_label') %></label>
+                            <input type="text" id="settingsRegisterUsername" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsRegisterEmail"><%= t('email_label') %></label>
+                            <input type="email" id="settingsRegisterEmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsRegisterPassword"><%= t('password_label') %></label>
+                            <input type="password" id="settingsRegisterPassword" required minlength="6">
+                        </div>
+                        <button type="submit" class="settings-auth-submit-btn" id="settingsRegisterSubmitBtn"><%= t('register_button_text') %></button>
+                        <div id="settingsRegisterMessage"></div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="settings-actions">
+                <button class="settings-close-btn" onclick="hideSettingsModal()"><%= t('close_button') %></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Credentials Modal -->
+    <div class="change-credentials-modal" id="changeCredentialsModal">
+        <div class="change-credentials-dialog">
+            <h3><%= t('change_credentials_title') %></h3>
+            <form class="change-form" id="changeForm" onsubmit="handleChangeCredentials(event)">
+                <div class="form-group">
+                    <label for="newUsername"><%= t('new_username_label') %></label>
+                    <input type="text" id="newUsername" placeholder="<%= t('leave_empty_placeholder') %>">
+                </div>
+                <div class="form-group">
+                    <label for="newEmail"><%= t('new_email_label') %></label>
+                    <input type="email" id="newEmail" placeholder="<%= t('leave_empty_placeholder') %>">
+                </div>
+                <div class="form-group">
+                    <label for="newPassword"><%= t('new_password_label') %></label>
+                    <input type="password" id="newPassword" placeholder="<%= t('leave_empty_placeholder') %>" minlength="6">
+                </div>
+                <button type="submit" class="change-submit-btn" id="changeSubmitBtn"><%= t('save_profile_button') %></button>
+                <div id="changeMessage"></div>
+            </form>
+            <div class="change-actions">
+                <button class="change-close-btn" onclick="hideChangeCredentialsModal()"><%= t('cancel_button') %></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.API_URL = '<%= apiUrl %>';
+    </script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

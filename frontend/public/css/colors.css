@@ -1,0 +1,93 @@
+/* ===========================================
+   WeRadio - Color Variables
+   Configurazione centralizzata dei colori
+   =========================================== */
+
+:root {
+  /* === COLORI PRIMARI (Brand) === */
+  --primary-color: #A8D2F8;
+  --primary-dark: #61affc;
+  --primary-gradient: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+
+  /* === COLORI SECONDARI === */
+  --secondary-color: #5C6361;
+  --secondary-light: #D7DBDB;
+  --secondary-dark: #2F4E4E;
+  --secondary-medium: #a8d8ff;
+
+  /* === COLORI DI BASE === */
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a5568;
+  --text-muted: #718096;
+
+  /* === COLORI DI SFONDO === */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f0f8ff;
+  --bg-tertiary: #e6f3ff;
+  --bg-disabled: #f5f5f5;
+
+  /* === COLORI DI STATO === */
+  --success-bg: #f0fff4;
+  --success-text: #22543d;
+  --warning-bg: #fffaf0;
+  --warning-text: #765b40;
+  --error-bg: #fed7d7;
+  --error-text: #fc8181;
+  --info-bg: #ebf8ff;
+  --info-text: #2a4365;
+
+  /* === COLORI DEI BORDI === */
+  --border-color: #e2e8f0;
+  --border-light: #f1f5f9;
+  --border-accent: var(--primary-color);
+
+  /* === COLORI PER ELEMENTI INTERATTIVI === */
+  --hover-bg: rgba(20, 182, 208, 0.1);
+  --active-bg: rgba(20, 182, 208, 0.15);
+  --focus-border: var(--primary-color);
+
+  /* === COLORI PER MODAL E OVERLAY === */
+  --modal-overlay: rgba(0, 0, 0, 0.6);
+  --modal-bg: #ffffff;
+  --modal-border: #e2e8f0;
+
+  /* === COLORI PER CONTROLLI FORM === */
+  --input-bg: #ffffff;
+  --input-border: #e2e8f0;
+  --input-focus-border: var(--primary-color);
+  --input-error-border: #fc8181;
+  --input-success-border: #68d391;
+
+  /* === COLORI PER PULSANTI === */
+  --btn-primary-bg: var(--primary-gradient);
+  --btn-primary-text: #ffffff;
+  --btn-secondary-bg: #f7fafc;
+  --btn-secondary-text: #4a5568;
+  --btn-success-bg: #48bb78;
+  --btn-success-text: #ffffff;
+  --btn-danger-bg: #f56565;
+  --btn-danger-text: #ffffff;
+  --btn-warning-bg: #ed8936;
+  --btn-warning-text: #ffffff;
+
+  /* === COLORI PER TRACK LIST === */
+  --track-item-bg: #ffffff;
+  --track-item-hover: #f7fafc;
+  --track-item-border: #e2e8f0;
+  --track-badge-bg: var(--primary-color);
+  --track-badge-text: #ffffff;
+
+  /* === COLORI PER PLAYER === */
+  --player-bg: var(--primary-gradient);
+  --player-text: #ffffff;
+  --progress-bg: rgba(255, 255, 255, 0.3);
+  --progress-fill: #ffffff;
+
+  /* === GRADIENTI === */
+  --primary-gradient: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+  --bg-gradient: linear-gradient(to bottom, #ffffff 0%, #a8d2f8 50%, #61affc 100%);
+
+  /* === COLORI PER ANIMAZIONI === */
+  --pulse-color: var(--primary-color);
+  --loading-spinner: var(--primary-color);
+}
