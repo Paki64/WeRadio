@@ -135,7 +135,7 @@ def upload():
 
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
-    
+
     file = request.files['file']
     
     if file.filename == '':
@@ -203,9 +203,10 @@ def upload():
             # Check in local filesystem
             final_filepath = os.path.join(UPLOAD_FOLDER, final_filename)
             if os.path.exists(final_filepath):
-                final_filename = f"{base_name}_{int(time.time())}.aac"
-                final_filepath = os.path.join(UPLOAD_FOLDER, final_filename)
-        
+                logger.warning(f"File exists: {final_filepath}")
+                return jsonify({'error': f'File already exists: {final_filepath}'}), 409
+
+
         logger.info(f"Converting: {temp_filename} → {final_filename}")
         
         # Convert to AAC

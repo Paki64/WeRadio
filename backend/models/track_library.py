@@ -226,13 +226,7 @@ class TrackLibrary:
         if not is_valid:
             return {'success': False, 'message': error}
         
-        success, message = TrackManager.remove_from_library(self.available_tracks, track_path)
-        if not success:
-            return {'success': False, 'message': message}
-        
-        logger.info(f"Removed from library: {os.path.basename(track_path)}")
-        
-        # Delete files
+        # Delete files first
         if self.storage_manager.use_object_storage:
             # Delete from MinIO
             success, message = TrackManager.delete_track_files(
@@ -257,6 +251,13 @@ class TrackLibrary:
             )
             if not success:
                 return {'success': False, 'message': message}
+        
+        # Only remove from library if file deletion succeeded
+        success, message = TrackManager.remove_from_library(self.available_tracks, track_path)
+        if not success:
+            return {'success': False, 'message': message}
+        
+        logger.info(f"Removed from library: {os.path.basename(track_path)}")
         
         cache_key = f"{self.upload_folder}/{track_path}"
         with self.metadata_lock:
