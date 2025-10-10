@@ -4,7 +4,7 @@ WeRadio - Track Management Utilities
 
 Utilities for managing music track files.
 
-Version: 0.3
+Version: 0.4
 """
 
 import os
@@ -161,15 +161,4 @@ class TrackManager:
             return False, "Track not in library"
         
         return True, ""
-    
-    @staticmethod
-    def is_track_file(filename, supported_formats):
-        """
-        Checks if a file is a supported audio track.
-        
-        Args:
-            filename (str): Filename to check
-            supported_formats (set): Set of supported extensions
-        """
-        ext = os.path.splitext(filename)[1].lower()
-        return ext in supported_formats
+

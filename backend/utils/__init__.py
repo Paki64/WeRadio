@@ -2,7 +2,7 @@
 WeRadio - Package Initializer
 ====================================
 
-Version: 0.3
+Version: 0.4
 """
 
 from .audio_processor import (
@@ -23,6 +23,10 @@ from .track_manager import TrackManager
 from .redis_manager import redis_manager
 from .storage_manager import StorageManager
 from .silence_generator import SilenceGenerator, SILENCE_FILENAME
+from .db_manager import DatabaseManager
+from .db_manager import UserRepository
+from .auth_service import AuthService
+from .auth_service import require_auth, require_admin, require_user_or_admin
 
 __all__ = [
     # Audio processing
@@ -53,4 +57,14 @@ __all__ = [
     # Silence generation
     'SilenceGenerator',
     'SILENCE_FILENAME',
+
+    # Database management
+    'DatabaseManager',
+    'UserRepository',
+
+    # Authentication service
+    'AuthService',
+    'require_auth',
+    'require_admin',
+    'require_user_or_admin'
 ]

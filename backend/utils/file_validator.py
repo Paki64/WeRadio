@@ -89,20 +89,3 @@ def validate_file_extension(filename, allowed_extensions):
     """
     ext = os.path.splitext(filename)[1].lower()
     return ext in allowed_extensions
-
-
-def sanitize_filename(filename):
-    """
-    Sanitizes a filename by removing potentially dangerous characters.
-    
-    Args:
-        filename (str): The filename to sanitize
-    """
-    # Replace dangerous characters with underscores
-    dangerous_chars = ['..', '/', '\\', '\0']
-    sanitized = filename
-    
-    for char in dangerous_chars:
-        sanitized = sanitized.replace(char, '_')
-    
-    return sanitized

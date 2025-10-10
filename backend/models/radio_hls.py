@@ -4,7 +4,7 @@ WeRadio - RadioHLS Coordinator
 
 Main coordinator class that integrates library, queue, and streaming components.
 
-Version: 0.3
+Version: 0.4
 """
 
 import os

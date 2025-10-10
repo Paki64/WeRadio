@@ -4,7 +4,7 @@ WeRadio - Redis Manager
 
 Manages Redis connection and state synchronization between nodes.
 
-Version: 0.3
+Version: 0.4
 """
 
 import json

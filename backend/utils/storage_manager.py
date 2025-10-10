@@ -5,7 +5,7 @@ WeRadio - Storage Manager
 Abstraction layer for storage operations supporting both local filesystem
 and MinIO object storage.
 
-Version: 0.3
+Version: 0.4
 """
 
 import os
@@ -285,20 +285,3 @@ class StorageManager:
             return True
         except Exception:
             return False
-    
-    def get_full_path(self, filepath: str, base_path: str) -> str:
-        """
-        Get the full path for a file (only for local filesystem).
-        For MinIO, returns a temporary path identifier.
-        
-        Args:
-            filepath: Relative file path
-            base_path: Base path for local filesystem
-            
-        Returns:
-            Full path or identifier
-        """
-        if self.use_object_storage:
-            return f"minio://{filepath}"
-        else:
-            return os.path.join(base_path, filepath)

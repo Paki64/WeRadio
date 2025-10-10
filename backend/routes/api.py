@@ -6,14 +6,14 @@ Flask routes for API endpoints:
 - /status - Current playback status
 - /tracks - List all available tracks
 
-Version: 0.3
+Version: 0.4
 """
 
 import os
 import logging
 from flask import Blueprint, jsonify, request
 from config import UPLOAD_FOLDER, OBJECT_STORAGE
-from utils import redis_manager, StorageManager
+from utils import redis_manager, StorageManager, require_admin, require_user_or_admin
 
 
 # === Logging Configuration ===
@@ -29,7 +29,6 @@ api_bp = Blueprint('api', __name__)
 # === API Routes ===
 
 radio = None # Radio instance will be set by the main app
-
 
 def init_radio(radio_instance):
     """
@@ -147,7 +146,7 @@ def index():
     """
     return jsonify({
         'name': 'WeRadio Streaming Service',
-        'version': '0.1',
+        'version': '0.4',
         'endpoints': {
             'playlist': '/playlist.m3u8',
             'status': '/status',
@@ -161,6 +160,7 @@ def index():
 
 
 @api_bp.route('/track/remove', methods=['POST'])
+@require_admin()
 def remove_track():
     """
     Removes a track from the system completely.

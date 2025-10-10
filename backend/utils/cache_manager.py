@@ -4,7 +4,7 @@ WeRadio - Cache Management Utilities
 
 Utilities for managing caches.
 
-Version: 0.3
+Version: 0.4
 """
 
 import os
@@ -100,37 +100,6 @@ class CacheManager:
         logger.info(f"Metadata cache cleaned: removed {to_remove} entries")
         return to_remove
     
-    @staticmethod
-    def get_cache_stats(cache_folder=None, cache_dict=None, file_pattern='*.aac'):
-        """
-        Gets statistics about cache usage.
-        
-        Args:
-            cache_folder (str, optional): Path to file cache folder
-            cache_dict (dict, optional): In-memory cache dictionary
-            file_pattern (str): Glob pattern for cache files
-        """
-        stats = {}
-        
-        if cache_folder:
-            try:
-                cache_files = list(Path(cache_folder).glob(file_pattern))
-                total_size = sum(f.stat().st_size for f in cache_files)
-                stats['file_cache'] = {
-                    'count': len(cache_files),
-                    'total_size_mb': round(total_size / (1024 * 1024), 2)
-                }
-            except Exception as e:
-                logger.error(f"Error getting file cache stats: {e}")
-                stats['file_cache'] = {'error': str(e)}
-        
-        if cache_dict is not None:
-            stats['metadata_cache'] = {
-                'count': len(cache_dict)
-            }
-        
-        return stats
-    
     # === Audio Cache Specific Methods ===
     
     @staticmethod
@@ -187,64 +156,4 @@ class CacheManager:
         """
         file_hash = hashlib.md5(filepath.encode()).hexdigest()
         return os.path.join(cache_folder, f"{file_hash}.aac")
-    
-    @staticmethod
-    def is_file_cached(filepath, cache_folder):
-        """
-        Checks if a file has a cached version.
-        
-        Args:
-            filepath (str): Original file path
-            cache_folder (str): Cache folder path
-        """
-        cached_path = CacheManager.get_cache_path_for_file(filepath, cache_folder)
-        return os.path.exists(cached_path)
-    
-    @staticmethod
-    def remove_from_cache(filepath, cache_folder):
-        """
-        Removes a file's cached version.
-        
-        Args:
-            filepath (str): Original file path
-            cache_folder (str): Cache folder path
-        """
-        try:
-            cached_path = CacheManager.get_cache_path_for_file(filepath, cache_folder)
-            
-            if not os.path.exists(cached_path):
-                return True, "No cached version found"
-            
-            os.remove(cached_path)
-            logger.info(f"Removed from cache: {os.path.basename(cached_path)}")
-            return True, "Cached file removed"
-            
-        except Exception as e:
-            logger.error(f"Error removing from cache: {e}")
-            return False, f"Error: {str(e)}"
-    
-    @staticmethod
-    def clear_all_cache(cache_folder):
-        """
-        Clears all files from the audio cache.
-        
-        Args:
-            cache_folder (str): Path to cache folder
-        """
-        try:
-            cache_files = list(Path(cache_folder).glob('*.aac'))
-            removed = 0
-            
-            for cache_file in cache_files:
-                try:
-                    cache_file.unlink()
-                    removed += 1
-                except Exception as e:
-                    logger.error(f"Failed to remove {cache_file.name}: {e}")
-            
-            logger.info(f"Cache cleared: {removed} files removed")
-            return True, removed
-            
-        except Exception as e:
-            logger.error(f"Error clearing cache: {e}")
-            return False, 0
+

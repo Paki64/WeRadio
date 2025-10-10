@@ -4,7 +4,7 @@ WeRadio - Silence Generator Utility
 
 Generates a silent AAC audio file as a fallback for empty libraries.
 
-Version: 0.3
+Version: 0.4
 """
 
 import os
@@ -162,6 +162,9 @@ class SilenceGenerator:
             bool: True if removed or didn't exist, False on error
         """
         try:
+
+            
+
             if storage_manager and storage_manager.use_object_storage:
                 # Object storage mode
                 if storage_manager.file_exists(SILENCE_FILENAME, library_folder, 'library'):

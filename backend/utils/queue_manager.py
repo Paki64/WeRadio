@@ -5,7 +5,7 @@ WeRadio - Queue Management Utilities
 Utilities for managing playback queue operations.
 Handles queue initialization, refilling, and track selection.
 
-Version: 0.3
+Version: 0.4
 """
 
 import logging

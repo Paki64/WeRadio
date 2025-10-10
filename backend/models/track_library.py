@@ -4,7 +4,7 @@ WeRadio - Track Library Manager
 
 Manages the music track library and metadata operations.
 
-Version: 0.3 - Storage abstraction support
+Version: 0.4
 """
 
 import os
@@ -19,7 +19,7 @@ from config import (
 )
 from utils import (
     get_metadata, 
-    CacheManager, TrackManager, StorageManager,
+    CacheManager, TrackManager, StorageManager, QueueManager,
     SilenceGenerator, SILENCE_FILENAME
 )
 
@@ -242,7 +242,7 @@ class TrackLibrary:
                 upload_folder=self.upload_folder,
                 cache_folder=self.cache_folder,
                 available_tracks=self.available_tracks,
-                queue=self.queue
+                queue=None
             )
             if not success:
                 return {'success': False, 'message': message}
@@ -253,7 +253,7 @@ class TrackLibrary:
                 abs_track_path, 
                 lambda fp: self.get_clean_audio(track_path),
                 available_tracks=self.available_tracks,
-                queue=self.queue
+                queue=None
             )
             if not success:
                 return {'success': False, 'message': message}
@@ -263,15 +263,6 @@ class TrackLibrary:
             self.metadata_cache.pop(cache_key, None)
         
         return {'success': True, 'message': 'Track removed from library'}
-    
-    def is_track_in_library(self, track_path):
-        """
-        Checks if a track is in the library.
-        
-        Args:
-            track_path (str): Relative path to check
-        """
-        return track_path in self.available_tracks
     
     def get_track_count(self):
         """
@@ -287,6 +278,8 @@ class TrackLibrary:
         if SILENCE_FILENAME in self.available_tracks:
             logger.info("Removing silence placeholder (real track added)")
             
+            QueueManager.remove_track_from_queue(self.queue, self.upload_folder, available_tracks=self.available_tracks)
+
             success = SilenceGenerator.remove_silence_file(
                 self.upload_folder,
                 self.storage_manager

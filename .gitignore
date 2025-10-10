@@ -16,9 +16,12 @@ minio/
 postgres/
 redis/
 
-# Frontend (if generated)
+# Frontend 
 frontend/
-hls_output
+
+# Data
+data
+logs
 
 # System files
 .DS_Store

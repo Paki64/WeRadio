@@ -6,7 +6,7 @@ Flask routes for file upload and queue management:
 - /upload - Upload new tracks
 - /queue/add - Add track to playback queue
 
-Version: 0.3
+Version: 0.4
 """
 
 import os
@@ -14,7 +14,7 @@ import io
 import time
 import logging
 import tempfile
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 from werkzeug.utils import secure_filename
 
 from config import (
@@ -25,7 +25,8 @@ from config import (
 from utils import (
     validate_file_path, validate_filename, validate_file_extension,
     clean_metadata_from_filename, convert_to_aac,
-    QueueManager, redis_manager, get_metadata, StorageManager
+    QueueManager, redis_manager, get_metadata, StorageManager, 
+    require_user_or_admin
 )
 
 logger = logging.getLogger('WeRadio.Routes.Upload')
@@ -34,6 +35,7 @@ upload_bp = Blueprint('upload', __name__)
 
 radio = None
 storage_manager = None
+
 
 def init_radio(radio_instance):
     """
@@ -53,6 +55,7 @@ def init_radio(radio_instance):
 
 
 @upload_bp.route('/queue/add', methods=['POST'])
+@require_user_or_admin()
 def add_to_queue():
     """
     Adds a specific track to the playback queue.
@@ -84,8 +87,14 @@ def add_to_queue():
                 return jsonify({'error': message}), status_code
         
         meta = radio._get_track_metadata(rel_filepath)
-        logger.info(f"Added to queue: {meta['artist']} - {meta['title']}")
-        
+        from utils.auth_service import get_global_auth_service
+        auth_svc = get_global_auth_service()
+        if auth_svc is not None:
+            current_user = g.current_user
+            logger.info(f"Added to queue: {meta['artist']} - {meta['title']} by user {current_user['username']}")
+        else:
+            logger.info(f"Added to queue: {meta['artist']} - {meta['title']}")
+
         return jsonify({
             'success': True,
             'message': f'Added "{meta["artist"]} - {meta["title"]}" as next track',
@@ -110,11 +119,20 @@ def add_to_queue():
 
 
 @upload_bp.route('/upload', methods=['POST'])
+@require_user_or_admin()
 def upload():
     """
     Uploads a new track to the library.
     Converts to AAC format and adds metadata.
     """
+    from utils.auth_service import get_global_auth_service
+    auth_svc = get_global_auth_service()
+    if auth_svc is None:
+        logger.info(f"A user is trying to upload a track.")
+    else:
+        current_user = g.current_user
+        logger.info(f"User [{current_user['username']}] is trying to upload a track.")
+
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
     
