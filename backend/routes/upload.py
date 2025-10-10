@@ -73,9 +73,23 @@ def add_to_queue():
         # STREAMER mode: add directly to queue
         is_valid, error_msg, rel_filepath = validate_file_path(filepath, radio.upload_folder)
         if not is_valid:
-            logger.warning(f"Invalid path: {filepath} - {error_msg}")
-            status_code = 403 if error_msg == "Invalid file path" else 404
-            return jsonify({'error': error_msg}), status_code
+            # If using object storage, check if file exists in MinIO
+            if storage_manager and storage_manager.use_object_storage and error_msg == "File not found":
+                # Extract filename from path
+                filename = os.path.basename(filepath)
+                if storage_manager.file_exists(filename, UPLOAD_FOLDER, 'library'):
+                    # File exists in MinIO, use the filename as rel_filepath
+                    rel_filepath = filename
+                    is_valid = True
+                    error_msg = ""
+                else:
+                    logger.warning(f"Invalid path: {filepath} - {error_msg}")
+                    status_code = 403 if error_msg == "Invalid file path" else 404
+                    return jsonify({'error': error_msg}), status_code
+            else:
+                logger.warning(f"Invalid path: {filepath} - {error_msg}")
+                status_code = 403 if error_msg == "Invalid file path" else 404
+                return jsonify({'error': error_msg}), status_code
         
         with radio.playlist_lock:
             success, message = QueueManager.add_track_to_queue(
@@ -265,16 +279,20 @@ def upload():
         # Reload available tracks and get final metadata
         if radio:
             radio.load_available_tracks()
-            radio.track_library.remove_silence_if_exists()
+            radio.track_library.remove_silence_if_exists(radio.playback_queue)
             
             rel_final_path = final_filename
             meta_after = radio._get_track_metadata(rel_final_path)
             
-            # If the queue is empty and nothing is playing, add and start playback immediately
-            if radio.playback_queue.is_empty() and not radio.playing:
-                logger.info("Queue empty and nothing playing - starting playback with uploaded track")
-                with radio.playlist_lock:
-                    radio.playback_queue.queue.append(rel_final_path)
+            # Always add the uploaded track to the queue and start playback
+            logger.info("Adding uploaded track to queue and starting playback")
+            with radio.playlist_lock:
+                radio.playback_queue.queue.appendleft(rel_final_path)  # Add to front to play next
+            
+            # If nothing is playing, start playback
+            if not radio.playing:
+                logger.info("Nothing playing - starting playback with uploaded track")
+                # The HLS streamer will pick up the next track from queue
 
         else:
             redis_manager.publish_reload_tracks()

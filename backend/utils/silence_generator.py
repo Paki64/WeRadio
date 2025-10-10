@@ -130,8 +130,9 @@ class SilenceGenerator:
                     else:
                         logger.error("Failed to upload silence file to object storage")
                         return False, None
-                else:
-                    return False, None
+            except Exception as e:
+                logger.error(f"Failed to upload silence file to object storage: {e}")
+                return False, None
             finally:
                 # Cleanup temp file
                 if os.path.exists(temp_path):

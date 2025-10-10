@@ -50,6 +50,27 @@ def status():
     if radio:
         queue_info = radio.get_queue_info()
         current_time = radio.get_current_playback_time()
+        tracks = radio.available_tracks
+        queue = queue_info['queue']
+        
+        # Build queue with metadata
+        queue_with_meta = []
+        for queue_path in queue:
+            track = next((t for t in tracks if t.get('path') == queue_path), None)
+            if track:
+                queue_with_meta.append({
+                    'artist': track.get('artist', 'Unknown'),
+                    'title': track.get('title', 'Unknown'),
+                    'path': queue_path
+                })
+            else:
+                filename = queue_path.split('/')[-1]
+                name_without_ext = filename.rsplit('.', 1)[0] if '.' in filename else filename
+                queue_with_meta.append({
+                    'artist': 'Unknown',
+                    'title': name_without_ext,
+                    'path': queue_path
+                })
         
         return jsonify({
             'playing': radio.playing,
@@ -58,7 +79,7 @@ def status():
             'next_track': queue_info['next_track'],
             'available_tracks': len(radio.available_tracks),
             'queue_length': queue_info['length'],
-            'queue': queue_info['queue']
+            'queue': queue_with_meta
         })
     
     # API-only mode: read from Redis
@@ -69,6 +90,25 @@ def status():
     queue = redis_manager.get_queue()
     current_time = redis_manager.get_playback_time()
     available_tracks = redis_manager.get_available_tracks()
+    
+    # Build queue with metadata
+    queue_with_meta = []
+    for queue_path in queue:
+        track = next((t for t in available_tracks if t.get('filepath') == queue_path), None)
+        if track:
+            queue_with_meta.append({
+                'artist': track.get('artist', 'Unknown'),
+                'title': track.get('title', 'Unknown'),
+                'path': queue_path
+            })
+        else:
+            filename = queue_path.split('/')[-1]
+            name_without_ext = filename.rsplit('.', 1)[0] if '.' in filename else filename
+            queue_with_meta.append({
+                'artist': 'Unknown',
+                'title': name_without_ext,
+                'path': queue_path
+            })
     
     # Determine next track metadata
     next_track = None
@@ -90,7 +130,7 @@ def status():
         'next_track': next_track,
         'available_tracks': len(available_tracks),
         'queue_length': len(queue),
-        'queue': queue
+        'queue': queue_with_meta
     })
 
 

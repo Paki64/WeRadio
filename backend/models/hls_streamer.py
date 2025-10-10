@@ -69,10 +69,28 @@ class HLSStreamer:
     
     def _initialize_hls_folder(self):
         """Creates/cleans HLS output folder."""
-        if os.path.exists(self.hls_folder):
-            shutil.rmtree(self.hls_folder)
-        os.makedirs(self.hls_folder, exist_ok=True)
-        logger.info("HLS folder initialized")
+        try:
+            if os.path.exists(self.hls_folder):
+                # Clean all files but keep the directory
+                for filename in os.listdir(self.hls_folder):
+                    file_path = os.path.join(self.hls_folder, filename)
+                    try:
+                        if os.path.isfile(file_path) or os.path.islink(file_path):
+                            os.unlink(file_path)
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)
+                    except Exception as e:
+                        logger.warning(f"Could not delete {file_path}: {e}")
+            else:
+                os.makedirs(self.hls_folder, exist_ok=True)
+            logger.info("HLS folder initialized and cleaned")
+        except Exception as e:
+            logger.error(f"Error initializing HLS folder: {e}")
+            # Fallback: try to create directory
+            try:
+                os.makedirs(self.hls_folder, exist_ok=True)
+            except Exception as e2:
+                logger.error(f"Could not create HLS folder: {e2}")
     
     def start(self):
         """

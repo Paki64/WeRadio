@@ -192,7 +192,8 @@ class StorageManager:
             self._write_file_minio(filepath, data, folder_type, content_type)
         else:
             self._write_file_local(filepath, data, base_path)
-    
+        return True
+
     def _write_file_local(self, filepath: str, data: bytes, base_path: str):
         """Write file to local filesystem."""
         full_path = os.path.join(base_path, filepath)
@@ -212,8 +213,9 @@ class StorageManager:
                 length=len(data),
                 content_type=content_type
             )
+            logger.debug(f"Successfully wrote file {filepath} to MinIO bucket {bucket}")
         except Exception as e:
-            logger.error(f"Error writing file {filepath} to MinIO: {e}")
+            logger.error(f"Error writing file {filepath} to MinIO bucket {bucket}: {e}")
             raise
     
     def delete_file(self, filepath: str, base_path: str, folder_type: str = 'library') -> bool:

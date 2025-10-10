@@ -108,7 +108,7 @@ class TrackLibrary:
         """
         if SilenceGenerator.is_silence_file(filepath):
             return {
-                'title': 'Libreria vuota',
+                'title': 'Silence',
                 'artist': 'WeRadio',
                 'duration': 5.0,
                 'filepath': filepath
@@ -209,12 +209,13 @@ class TrackLibrary:
                 CACHE_MAX_SIZE
             )
     
-    def remove_track(self, track_path):
+    def remove_track(self, track_path, playback_queue=None):
         """
         Removes a track from the library and deletes its files.
         
         Args:
             track_path (str): Relative path to the track
+            playback_queue: Optional PlaybackQueue instance to remove from queue
         """
         if SilenceGenerator.is_silence_file(track_path):
             return {
@@ -252,6 +253,10 @@ class TrackLibrary:
             if not success:
                 return {'success': False, 'message': message}
         
+        # Remove from queue if provided
+        if playback_queue:
+            playback_queue.remove_from_queue_if_present(track_path)
+        
         # Only remove from library if file deletion succeeded
         success, message = TrackManager.remove_from_library(self.available_tracks, track_path)
         if not success:
@@ -271,7 +276,7 @@ class TrackLibrary:
         """
         return len(self.available_tracks)
     
-    def remove_silence_if_exists(self):
+    def remove_silence_if_exists(self, playback_queue=None):
         """
         Removes the silence placeholder file if it exists.
         Should be called when a real track is added to the library.
@@ -279,8 +284,10 @@ class TrackLibrary:
         if SILENCE_FILENAME in self.available_tracks:
             logger.info("Removing silence placeholder (real track added)")
             
-            QueueManager.remove_track_from_queue(self.queue, self.upload_folder, available_tracks=self.available_tracks)
-
+            # Remove from queue if present
+            if playback_queue:
+                playback_queue.remove_from_queue_if_present(SILENCE_FILENAME)
+            
             success = SilenceGenerator.remove_silence_file(
                 self.upload_folder,
                 self.storage_manager

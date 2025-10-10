@@ -136,7 +136,7 @@ class RadioHLS:
             track_path (str): Relative path to the track
         """
         try:
-            success, message = self.track_library.remove_track(track_path)
+            success, message = self.track_library.remove_track(track_path, self.playback_queue)
             if not success:
                 return {'success': False, 'message': message}
             
