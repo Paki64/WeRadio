@@ -31,11 +31,6 @@ logs
 .DS_Store
 **/.DS_Store
 
-# Docker and configuration files
-docker-compose.yml
-nginx.conf
-dockers.txt
-
 # Temporary files
 *.tmp
 *.temp
