@@ -7,126 +7,244 @@ let isPlaying = false;
 let hls = null;
 let currentUser = null;
 let authToken = null;
-
-// === COMMON AUTH FUNCTIONS ===
-async function performLogin(usernameId, passwordId, submitBtnId, messageDivId, onSuccess) {
-    const username = document.getElementById(usernameId).value;
-    const password = document.getElementById(passwordId).value;
-    const submitBtn = document.getElementById(submitBtnId);
-    const messageDiv = document.getElementById(messageDivId);
-    
-    submitBtn.disabled = true;
-    submitBtn.textContent = t('logging_in_text');
-    messageDiv.innerHTML = '';
-    
-    try {
-        const response = await fetch(`${API_URL}/auth/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, password })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            authToken = data.token;
-            currentUser = data.user;
-            
-            // Save to localStorage
-            localStorage.setItem('authToken', authToken);
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            
-            updateAuthUI();
-            onSuccess();
-            
-            messageDiv.innerHTML = `<div class="auth-success">${t('login_success')}</div>`;
-            setTimeout(() => {
-                messageDiv.innerHTML = '';
-            }, 2000);
-        } else {
-            messageDiv.innerHTML = `<div class="auth-error">${data.message || t('login_error')}</div>`;
-        }
-    } catch (error) {
-        console.error('Login error:', error);
-        messageDiv.innerHTML = `<div class="auth-error">${t('connection_error')}</div>`;
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = t('login_button_text');
-    }
-}
-
-async function performRegister(usernameId, emailId, passwordId, submitBtnId, messageDivId, onSuccess) {
-    const username = document.getElementById(usernameId).value;
-    const email = document.getElementById(emailId).value;
-    const password = document.getElementById(passwordId).value;
-    const submitBtn = document.getElementById(submitBtnId);
-    const messageDiv = document.getElementById(messageDivId);
-    
-    submitBtn.disabled = true;
-    submitBtn.textContent = t('registering_text');
-    messageDiv.innerHTML = '';
-    
-    try {
-        const response = await fetch(`${API_URL}/auth/register`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, email, password })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            onSuccess();
-            messageDiv.innerHTML = `<div class="auth-success">${t('register_success_full')}</div>`;
-            setTimeout(() => {
-                messageDiv.innerHTML = '';
-            }, 2000);
-        } else {
-            messageDiv.innerHTML = `<div class="auth-error">${data.message || t('register_error')}</div>`;
-        }
-    } catch (error) {
-        console.error('Register error:', error);
-        messageDiv.innerHTML = `<div class="auth-error">${t('connection_error')}</div>`;
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = t('register_button_text');
-    }
-}
-
-// === CUSTOM CONFIRM DIALOG ===
+let selectedFile = null;
+let allTracks = [];
 let confirmResolve = null;
+
+// Track duration and timing
+let currentTrackDuration = 0;
+let serverCurrentTime = 0;
+let lastUpdateTime = 0;
+
+// Set initial volume
+audio.volume = 0.7;
+
+// ========================================
+// AUTHENTICATION
+// ========================================
+
+async function performAuth(endpoint, data, submitBtn, messageDiv, onSuccess) {
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = endpoint === 'login' ? t('logging_in_text') : t('registering_text');
+    messageDiv.innerHTML = '';
+    
+    try {
+        const response = await fetch(`${API_URL}/auth/${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            if (endpoint === 'login') {
+                authToken = result.token;
+                currentUser = result.user;
+                localStorage.setItem('authToken', authToken);
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                updateAuthUI();
+            }
+            
+            const successMsg = endpoint === 'login' ? t('login_success') : t('register_success_full');
+            messageDiv.innerHTML = `<div class="auth-success">${successMsg}</div>`;
+            
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+                onSuccess();
+            }, 2000);
+        } else {
+            const errorMsg = endpoint === 'login' ? t('login_error') : t('register_error');
+            messageDiv.innerHTML = `<div class="auth-error">${result.message || errorMsg}</div>`;
+        }
+    } catch (error) {
+        console.error(`${endpoint} error:`, error);
+        messageDiv.innerHTML = `<div class="auth-error">${t('connection_error')}</div>`;
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
+}
+
+async function checkAuthStatus() {
+    const token = localStorage.getItem('authToken');
+    const user = localStorage.getItem('currentUser');
+    
+    if (token && user) {
+        try {
+            const response = await fetch(`${API_URL}/auth/verify`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (response.ok) {
+                authToken = token;
+                currentUser = JSON.parse(user);
+                updateAuthUI();
+                return;
+            }
+        } catch (error) {
+            console.error('Token verification failed:', error);
+        }
+    }
+    
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('currentUser');
+    updateAuthUI();
+}
+
+function logout() {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('currentUser');
+    updateAuthUI();
+    
+    const settingsModal = document.getElementById('settingsModal');
+    if (settingsModal.classList.contains('active')) {
+        document.getElementById('settingsLoggedIn').style.display = 'none';
+        document.getElementById('settingsAuth').style.display = 'block';
+    }
+}
+
+function updateAuthUI() {
+    const logoSubtitle = document.querySelector('.logo p');
+    
+    if (currentUser) {
+        logoSubtitle.textContent = t('welcome_message').replace('{username}', currentUser.username);
+        logoSubtitle.classList.add('welcome-message');
+    } else {
+        logoSubtitle.textContent = t('app_subtitle');
+        logoSubtitle.classList.remove('welcome-message');
+    }
+    
+    updateProtectedFeatures();
+}
+
+function updateProtectedFeatures() {
+    const isLoggedIn = !!currentUser;
+    document.querySelector('.upload-section').style.display = isLoggedIn ? '' : 'none';
+    document.querySelector('.tracks-section').style.display = isLoggedIn ? '' : 'none';
+}
+
+async function authenticatedFetch(url, options = {}) {
+    const headers = { ...options.headers };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    return fetch(url, { ...options, headers });
+}
+
+// ========================================
+// MODAL MANAGEMENT
+// ========================================
+
+const modals = {
+    auth: 'authModal',
+    settings: 'settingsModal',
+    tracks: 'tracksModal',
+    changeCredentials: 'changeCredentialsModal',
+    confirm: 'confirmOverlay'
+};
+
+function showModal(modalName, onShow) {
+    const modalId = modals[modalName];
+    if (onShow) onShow();
+    document.getElementById(modalId).classList.add('active');
+}
+
+function hideModal(modalName, onHide) {
+    const modalId = modals[modalName];
+    const modal = document.getElementById(modalId);
+    
+    if (modal.classList.contains('active')) {
+        modal.classList.add('closing');
+        setTimeout(() => {
+            modal.classList.remove('active', 'closing');
+            if (onHide) onHide();
+        }, 300);
+    }
+}
+
+function showAuthModal() {
+    showModal('auth', () => document.getElementById('loginUsername').focus());
+}
+
+function hideAuthModal() {
+    hideModal('auth', () => {
+        document.getElementById('loginForm').reset();
+        document.getElementById('registerForm').reset();
+        document.getElementById('loginMessage').innerHTML = '';
+        document.getElementById('registerMessage').innerHTML = '';
+    });
+}
+
+function showSettings() {
+    showModal('settings', () => {
+        fetch(`${API_URL}/`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('radioName').textContent = data.name;
+                document.getElementById('apiVersion').textContent = `v${data.version}`;
+            })
+            .catch(() => {
+                document.getElementById('radioName').textContent = t('radio_name');
+                document.getElementById('apiVersion').textContent = t('api_version');
+            });
+        
+        const isLoggedIn = currentUser && authToken;
+        document.getElementById('settingsLoggedIn').style.display = isLoggedIn ? 'block' : 'none';
+        document.getElementById('settingsAuth').style.display = isLoggedIn ? 'none' : 'block';
+    });
+}
+
+function hideSettingsModal() {
+    hideModal('settings', () => {
+        document.getElementById('settingsLoginForm').reset();
+        document.getElementById('settingsRegisterForm').reset();
+        document.getElementById('settingsLoginMessage').innerHTML = '';
+        document.getElementById('settingsRegisterMessage').innerHTML = '';
+    });
+}
+
+function showTracksModal() {
+    showModal('tracks', () => loadTracksList());
+}
+
+function hideTracksModal() {
+    hideModal('tracks');
+}
+
+function showChangeCredentials() {
+    hideSettingsModal();
+    showModal('changeCredentials', () => {
+        document.getElementById('changeForm').reset();
+        document.getElementById('changeMessage').innerHTML = '';
+    });
+}
+
+function hideChangeCredentialsModal() {
+    hideModal('changeCredentials');
+}
 
 function showConfirmDialog(title, message, type = 'confirm', showCancel = true) {
     return new Promise((resolve) => {
         confirmResolve = resolve;
         document.getElementById('confirmTitle').textContent = title;
         document.getElementById('confirmMessage').textContent = message;
-        document.getElementById('confirmOverlay').classList.add('active');
         
         const confirmBtn = document.getElementById('confirmBtn');
         const cancelBtn = document.querySelector('.confirm-btn-cancel');
         
-        // Set the confirm button style
-        let btnClass = 'confirm-btn-confirm';
-        if (type === 'warning') {
-            btnClass = 'confirm-btn-warning';
-        } else if (type === 'success') {
-            btnClass = 'confirm-btn-success';
-        }
-        confirmBtn.className = 'confirm-btn ' + btnClass;
+        const btnClasses = {
+            warning: 'confirm-btn-warning',
+            success: 'confirm-btn-success',
+            confirm: 'confirm-btn-confirm'
+        };
         
-        // Show/hide the Cancel button
-        if (showCancel) {
-            cancelBtn.style.display = 'block';
-            confirmBtn.textContent = t('confirm_button');
-        } else {
-            cancelBtn.style.display = 'none';
-            confirmBtn.textContent = t('ok_button');
-        }
+        confirmBtn.className = `confirm-btn ${btnClasses[type] || btnClasses.confirm}`;
+        cancelBtn.style.display = showCancel ? 'block' : 'none';
+        confirmBtn.textContent = showCancel ? t('confirm_button') : t('ok_button');
+        
+        document.getElementById('confirmOverlay').classList.add('active');
     });
 }
 
@@ -144,90 +262,56 @@ function closeConfirmDialog(result) {
     }
 }
 
-function showSettings() {
-    // Load radio info
-    fetch(`${API_URL}/`)
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('radioName').textContent = data.name;
-            document.getElementById('apiVersion').textContent = `v${data.version}`;
-        })
-        .catch(error => {
-            console.error('Error loading radio info:', error);
-            document.getElementById('radioName').textContent = t('radio_name');
-            document.getElementById('apiVersion').textContent = t('api_version');
-        });
-
-    // Show appropriate sections based on login status
-    const loggedInSection = document.getElementById('settingsLoggedIn');
-    const authSection = document.getElementById('settingsAuth');
+function switchAuthTab(tab, isSettings = false) {
+    const prefix = isSettings ? 'settings-auth-tab' : 'auth-tab';
+    const loginTab = document.querySelector(`.${prefix}:nth-child(1)`);
+    const registerTab = document.querySelector(`.${prefix}:nth-child(2)`);
+    const loginForm = document.getElementById(isSettings ? 'settingsLoginForm' : 'loginForm');
+    const registerForm = document.getElementById(isSettings ? 'settingsRegisterForm' : 'registerForm');
     
-    if (currentUser && authToken) {
-        loggedInSection.style.display = 'block';
-        authSection.style.display = 'none';
-    } else {
-        loggedInSection.style.display = 'none';
-        authSection.style.display = 'block';
-    }
-
-    document.getElementById('settingsModal').classList.add('active');
-}
-
-function hideSettingsModal() {
-    const modal = document.getElementById('settingsModal');
-    if (modal.classList.contains('active')) {
-        modal.classList.add('closing');
-        setTimeout(() => {
-            modal.classList.remove('active', 'closing');
-            // Reset auth forms
-            document.getElementById('settingsLoginForm').reset();
-            document.getElementById('settingsRegisterForm').reset();
-            document.getElementById('settingsLoginMessage').innerHTML = '';
-            document.getElementById('settingsRegisterMessage').innerHTML = '';
-        }, 300);
-    }
-}
-
-function showTracksModal() {
-    // Always load fresh tracks when opening modal
-    loadTracksList();
+    const isLogin = tab === 'login';
+    loginTab.classList.toggle('active', isLogin);
+    registerTab.classList.toggle('active', !isLogin);
+    loginForm.classList.toggle('active', isLogin);
+    registerForm.classList.toggle('active', !isLogin);
     
-    document.getElementById('tracksModal').classList.add('active');
-}
-
-function hideTracksModal() {
-    const modal = document.getElementById('tracksModal');
-    if (modal.classList.contains('active')) {
-        modal.classList.add('closing');
-        setTimeout(() => {
-            modal.classList.remove('active', 'closing');
-        }, 300);
+    if (!isSettings) {
+        const switchText = document.getElementById('authSwitchText');
+        switchText.innerHTML = isLogin ? t('no_account') : t('have_account');
     }
 }
 
 function switchSettingsAuthTab(tab) {
-    const loginTab = document.querySelector('.settings-auth-tab:nth-child(1)');
-    const registerTab = document.querySelector('.settings-auth-tab:nth-child(2)');
-    const loginForm = document.getElementById('settingsLoginForm');
-    const registerForm = document.getElementById('settingsRegisterForm');
+    switchAuthTab(tab, true);
+}
 
-    if (tab === 'login') {
-        loginTab.classList.add('active');
-        registerTab.classList.remove('active');
-        loginForm.classList.add('active');
-        registerForm.classList.remove('active');
-    } else {
-        registerTab.classList.add('active');
-        loginTab.classList.remove('active');
-        registerForm.classList.add('active');
-        loginForm.classList.remove('active');
-    }
+// ========================================
+// FORM HANDLERS
+// ========================================
+
+async function handleLogin(event) {
+    event.preventDefault();
+    await performAuth('login', {
+        username: document.getElementById('loginUsername').value,
+        password: document.getElementById('loginPassword').value
+    }, document.getElementById('loginSubmitBtn'), document.getElementById('loginMessage'), hideAuthModal);
+}
+
+async function handleRegister(event) {
+    event.preventDefault();
+    await performAuth('register', {
+        username: document.getElementById('registerUsername').value,
+        email: document.getElementById('registerEmail').value,
+        password: document.getElementById('registerPassword').value
+    }, document.getElementById('registerSubmitBtn'), document.getElementById('registerMessage'), () => switchAuthTab('login'));
 }
 
 async function handleSettingsLogin(event) {
     event.preventDefault();
-    await performLogin('settingsLoginUsername', 'settingsLoginPassword', 'settingsLoginSubmitBtn', 'settingsLoginMessage', () => {
-        // Update settings modal to show account section
+    await performAuth('login', {
+        username: document.getElementById('settingsLoginUsername').value,
+        password: document.getElementById('settingsLoginPassword').value
+    }, document.getElementById('settingsLoginSubmitBtn'), document.getElementById('settingsLoginMessage'), () => {
         document.getElementById('settingsLoggedIn').style.display = 'block';
         document.getElementById('settingsAuth').style.display = 'none';
     });
@@ -235,84 +319,11 @@ async function handleSettingsLogin(event) {
 
 async function handleSettingsRegister(event) {
     event.preventDefault();
-    await performRegister('settingsRegisterUsername', 'settingsRegisterEmail', 'settingsRegisterPassword', 'settingsRegisterSubmitBtn', 'settingsRegisterMessage', () => {
-        switchSettingsAuthTab('login');
-    });
-}
-
-function showChangeCredentials() {
-    hideSettingsModal();
-    document.getElementById('changeCredentialsModal').classList.add('active');
-    document.getElementById('changeForm').reset();
-    document.getElementById('changeMessage').innerHTML = '';
-}
-
-function hideChangeCredentialsModal() {
-    const modal = document.getElementById('changeCredentialsModal');
-    if (modal.classList.contains('active')) {
-        modal.classList.add('closing');
-        setTimeout(() => {
-            modal.classList.remove('active', 'closing');
-        }, 300);
-    }
-}
-
-// === AUTHENTICATION FUNCTIONS ===
-
-function showAuthModal() {
-    document.getElementById('authModal').classList.add('active');
-    document.getElementById('loginUsername').focus();
-}
-
-function hideAuthModal() {
-    const modal = document.getElementById('authModal');
-    if (modal.classList.contains('active')) {
-        modal.classList.add('closing');
-        setTimeout(() => {
-            modal.classList.remove('active', 'closing');
-            // Reset forms
-            document.getElementById('loginForm').reset();
-            document.getElementById('registerForm').reset();
-            document.getElementById('loginMessage').innerHTML = '';
-            document.getElementById('registerMessage').innerHTML = '';
-        }, 300);
-    }
-}
-
-function switchAuthTab(tab) {
-    const loginTab = document.querySelector('.auth-tab:nth-child(1)');
-    const registerTab = document.querySelector('.auth-tab:nth-child(2)');
-    const loginForm = document.getElementById('loginForm');
-    const registerForm = document.getElementById('registerForm');
-    const switchText = document.getElementById('authSwitchText');
-
-    if (tab === 'login') {
-        loginTab.classList.add('active');
-        registerTab.classList.remove('active');
-        loginForm.classList.add('active');
-        registerForm.classList.remove('active');
-        switchText.innerHTML = t('no_account');
-    } else {
-        registerTab.classList.add('active');
-        loginTab.classList.remove('active');
-        registerForm.classList.add('active');
-        loginForm.classList.remove('active');
-        switchText.innerHTML = t('have_account');
-    }
-}
-
-async function handleLogin(event) {
-    event.preventDefault();
-    await performLogin('loginUsername', 'loginPassword', 'loginSubmitBtn', 'loginMessage', () => {
-        hideAuthModal();
-    });
-}
-
-async function handleRegister(event) {
-    event.preventDefault();
-    await performRegister('registerUsername', 'registerEmail', 'registerPassword', 'registerSubmitBtn', 'registerMessage', () => {
-        switchAuthTab('login');
-    });
+    await performAuth('register', {
+        username: document.getElementById('settingsRegisterUsername').value,
+        email: document.getElementById('settingsRegisterEmail').value,
+        password: document.getElementById('settingsRegisterPassword').value
+    }, document.getElementById('settingsRegisterSubmitBtn'), document.getElementById('settingsRegisterMessage'), () => switchSettingsAuthTab('login'));
 }
 
 async function handleChangeCredentials(event) {
@@ -324,54 +335,42 @@ async function handleChangeCredentials(event) {
     const submitBtn = document.getElementById('changeSubmitBtn');
     const messageDiv = document.getElementById('changeMessage');
     
-    submitBtn.disabled = true;
-    submitBtn.textContent = t('updating_text');
-    messageDiv.innerHTML = '';
-    
-    // Prepare update data
     const updateData = {};
     if (newUsername) updateData.username = newUsername;
     if (newEmail) updateData.email = newEmail;
     if (newPassword) updateData.password = newPassword;
     
-    // Check if at least one field is provided
     if (Object.keys(updateData).length === 0) {
         messageDiv.innerHTML = `<div class="auth-error">${t('no_changes_error')}</div>`;
-        submitBtn.disabled = false;
-        submitBtn.textContent = t('update_button');
         return;
     }
     
+    submitBtn.disabled = true;
+    submitBtn.textContent = t('updating_text');
+    messageDiv.innerHTML = '';
+    
     try {
-        const response = await fetch(`${API_URL}/auth/profile`, {
+        const response = await authenticatedFetch(`${API_URL}/auth/profile`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updateData)
         });
         
         const data = await response.json();
         
         if (response.ok) {
-            // Update current user info if username changed
             if (data.user) {
                 currentUser = data.user;
                 localStorage.setItem('currentUser', JSON.stringify(currentUser));
                 updateAuthUI();
             }
-            
-            // Update token if provided
             if (data.token) {
                 authToken = data.token;
                 localStorage.setItem('authToken', authToken);
             }
             
             messageDiv.innerHTML = `<div class="auth-success">${t('credentials_updated')}</div>`;
-            setTimeout(() => {
-                hideChangeCredentialsModal();
-            }, 2000);
+            setTimeout(() => hideChangeCredentialsModal(), 2000);
         } else {
             messageDiv.innerHTML = `<div class="auth-error">${data.error || t('update_error')}</div>`;
         }
@@ -384,115 +383,21 @@ async function handleChangeCredentials(event) {
     }
 }
 
-function logout() {
-    authToken = null;
-    currentUser = null;
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('currentUser');
-    updateAuthUI();
-    
-    // If settings modal is open, update it to show auth section
-    const settingsModal = document.getElementById('settingsModal');
-    if (settingsModal.classList.contains('active')) {
-        document.getElementById('settingsLoggedIn').style.display = 'none';
-        document.getElementById('settingsAuth').style.display = 'block';
-    }
-}
-
-function updateAuthUI() {
-    const logoSubtitle = document.querySelector('.logo p');
-    
-    if (currentUser) {
-        // Show username instead of "HLS Live Streaming"
-        logoSubtitle.textContent = t('welcome_message').replace('{username}', currentUser.username);
-        logoSubtitle.classList.add('welcome-message');
-    } else {
-        // Restore original text when not logged in
-        logoSubtitle.textContent = t('app_subtitle');
-        logoSubtitle.classList.remove('welcome-message');
-    }
-    
-    // Update protected features
-    updateProtectedFeatures();
-}
-
-function updateProtectedFeatures() {
-    const isLoggedIn = !!currentUser;
-    const uploadSection = document.querySelector('.upload-section');
-    const tracksSection = document.querySelector('.tracks-section');
-    
-    if (isLoggedIn) {
-        uploadSection.style.display = '';
-        tracksSection.style.display = '';
-    } else {
-        uploadSection.style.display = 'none';
-        tracksSection.style.display = 'none';
-    }
-}
-
-async function checkAuthStatus() {
-    const token = localStorage.getItem('authToken');
-    const user = localStorage.getItem('currentUser');
-    
-    if (token && user) {
-        try {
-            // Verify token with server
-            const response = await fetch(`${API_URL}/auth/verify`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                authToken = token;
-                currentUser = JSON.parse(user);
-                updateAuthUI();
-                return;
-            }
-        } catch (error) {
-            console.error('Token verification failed:', error);
-        }
-    }
-    
-    // Clear invalid auth data
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('currentUser');
-    updateAuthUI();
-}
-
-// Helper function for authenticated requests
-async function authenticatedFetch(url, options = {}) {
-    const headers = { ...options.headers };
-    
-    if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-    }
-    
-    return fetch(url, {
-        ...options,
-        headers
-    });
-}
-
-// Imposta volume iniziale
-audio.volume = 0.7;
+// ========================================
+// HLS STREAMING
+// ========================================
 
 function initHLS() {
     if (Hls.isSupported()) {
         hls = new Hls({
-            
             maxBufferLength: 30,
             maxMaxBufferLength: 60,
             maxBufferSize: 60 * 1000 * 1000,
             maxBufferHole: 0.5,
-            startFragPrefetch: true,
-
-            liveSyncDuration: 2,
-            liveMaxLatencyDuration: 15,
+            liveSyncDuration: 3,
+            liveMaxLatencyDuration: 30,
             liveDurationInfinity: true,
             liveBackBufferLength: 0,
-            
             manifestLoadingTimeOut: 5000,
             manifestLoadingMaxRetry: 15,
             manifestLoadingRetryDelay: 200,
@@ -500,63 +405,48 @@ function initHLS() {
             levelLoadingMaxRetry: 15,
             fragLoadingTimeOut: 10000,
             fragLoadingMaxRetry: 15,
-            
-            maxBufferHole: 0.1,
             nudgeOffset: 0.1,
             nudgeMaxRetry: 15,
-            
-            // Worker
             enableWorker: true,
             enableSoftwareAES: true,
-            
-            // Start
             startLevel: -1,
             autoStartLoad: true,
             testBandwidth: false,
-            
-            // Buffer management
+            startFragPrefetch: true,
             lowLatencyMode: false,
             backBufferLength: 0,
-            
-            // Debugging
             debug: false
         });
         
         hls.loadSource(`${API_URL}/playlist.m3u8`);
         hls.attachMedia(audio);
         
-        hls.on(Hls.Events.MANIFEST_PARSED, function() {
-            console.log('HLS manifest parsed, ready to play');
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            console.log('✓ HLS manifest loaded');
             autoplayStream();
         });
         
-        hls.on(Hls.Events.ERROR, function(event, data) {
-            console.warn('HLS Event:', data.type, data.details);
-            
+        hls.on(Hls.Events.ERROR, (event, data) => {
             if (data.details === 'bufferStalledError') {
-                console.log('Buffer stalled, waiting for more data...');
+                console.log('⏳ Buffer stalled, waiting...');
                 return;
             }
             
             if (data.fatal) {
                 console.error('Fatal HLS error:', data);
-
+                statusDiv.textContent = t('reconnecting');
+                statusDiv.className = 'status buffering';
+                
                 switch(data.type) {
                     case Hls.ErrorTypes.NETWORK_ERROR:
-                        console.log('Network error, attempting recovery...');
-                        statusDiv.textContent = t('reconnecting');
-                        statusDiv.className = 'status buffering';
                         hls.startLoad();
                         break;
                     case Hls.ErrorTypes.MEDIA_ERROR:
-                        console.log('Media error, attempting recovery...');
                         hls.recoverMediaError();
                         break;
                     default:
-                        console.log('Irrecoverable error');
                         statusDiv.textContent = t('connection_error_status');
                         statusDiv.className = 'status';
-                        // Prova a ricreare tutto
                         setTimeout(() => {
                             if (isPlaying) {
                                 hls.destroy();
@@ -568,12 +458,11 @@ function initHLS() {
             }
         });
         
-        // Log quando il buffer è pronto
-        hls.on(Hls.Events.FRAG_BUFFERED, function(event, data) {
-            console.log('Fragment buffered:', data.frag.sn);
+        hls.on(Hls.Events.FRAG_BUFFERED, (event, data) => {
+            console.log('✓ Segment buffered:', data.frag.sn);
         });
         
-        hls.on(Hls.Events.FRAG_LOADED, function() {
+        hls.on(Hls.Events.FRAG_LOADED, () => {
             if (isPlaying) {
                 statusDiv.className = 'status live';
                 statusDiv.innerHTML = `<span class="live-indicator"></span>${t('live_status')}`;
@@ -582,9 +471,7 @@ function initHLS() {
         
     } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
         audio.src = `${API_URL}/playlist.m3u8`;
-        audio.addEventListener('loadedmetadata', function() {
-            autoplayStream();
-        });
+        audio.addEventListener('loadedmetadata', autoplayStream);
     }
 }
 
@@ -599,31 +486,25 @@ function autoplayStream() {
             playBtn.style.animation = 'none';
             statusDiv.className = 'status live';
             statusDiv.innerHTML = `<span class="live-indicator"></span>${t('live_status')}`;
-            console.log('Starting autoplay');
+            console.log('✓ Autoplay started');
             updateMetadata();
         })
         .catch(err => {
-            console.warn('Autoplay is disabled by browser:', err);
+            console.warn('Autoplay blocked:', err);
             statusDiv.innerHTML = t('click_to_listen');
             statusDiv.className = 'status';
-            playBtn.style.animation = 'pulse 2s infinite'; 
+            playBtn.style.animation = 'pulse 2s infinite';
         });
 }
 
 function togglePlay() {
-    if (!isPlaying) {
-        startStream();
-    } else {
-        stopStream();
-    }
+    isPlaying ? stopStream() : startStream();
 }
 
 function startStream() {
     if (!hls) {
         initHLS();
-        setTimeout(() => {
-            attemptPlay();
-        }, 500);
+        setTimeout(() => attemptPlay(), 500);
     } else {
         attemptPlay();
     }
@@ -641,7 +522,7 @@ function attemptPlay() {
             updateMetadata();
         })
         .catch(err => {
-            console.error('Errore play:', err);
+            console.error('Play error:', err);
             statusDiv.textContent = t('error_prefix') + err.message;
             statusDiv.className = 'status';
             playBtn.style.animation = 'pulse 2s infinite';
@@ -660,10 +541,9 @@ function setVolume(value) {
     audio.volume = value / 100;
 }
 
-// Track progress data
-let currentTrackDuration = 0;
-let serverCurrentTime = 0;
-let lastUpdateTime = 0;  
+// ========================================
+// METADATA & PROGRESS
+// ========================================
 
 async function updateMetadata() {
     try {
@@ -687,54 +567,45 @@ async function updateMetadata() {
             }
         }
         
-        // Next track
         const nextTrackDiv = document.getElementById('nextTrack');
         const nextTrackInfo = document.getElementById('next-track-info');
         if (data.next_track) {
             nextTrackDiv.style.display = 'block';
-            const nextText = `${data.next_track.artist} - ${data.next_track.title}`;
-            nextTrackInfo.textContent = nextText;
+            nextTrackInfo.textContent = `${data.next_track.artist} - ${data.next_track.title}`;
         } else {
             nextTrackDiv.style.display = 'none';
         }
         
-        // Update queue
         const queueList = document.getElementById('queueList');
         if (data.queue && data.queue.length > 0) {
-            queueList.innerHTML = data.queue.map((queueItem, index) => {
-                const artist = queueItem.artist || t('unknown_artist');
-                const title = queueItem.title || 'Unknown';
+            queueList.innerHTML = data.queue.map((item, index) => {
+                const artist = item.artist || t('unknown_artist');
+                const title = item.title || 'Unknown';
                 return `<div class="queue-item">${index + 1}. ${escapeHtml(artist)} - ${escapeHtml(title)}</div>`;
             }).join('');
         } else {
             queueList.innerHTML = `<div class="no-queue">${t('no_queue')}</div>`;
         }
         
-        if (isPlaying) {
-            setTimeout(updateMetadata, 3000);
-        }
+        if (isPlaying) setTimeout(updateMetadata, 3000);
     } catch (err) {
-        console.error('Errore metadata:', err);
+        console.error('Metadata error:', err);
     }
 }
 
-// Progress bar update
 function updateProgress() {
     if (isPlaying && currentTrackDuration > 0) {
         const timeSinceUpdate = (Date.now() - lastUpdateTime) / 1000;
         const currentTime = Math.min(serverCurrentTime + timeSinceUpdate, currentTrackDuration);
         const percentage = (currentTime / currentTrackDuration) * 100;
-        
         document.getElementById('progressFill').style.width = `${percentage}%`;
     }
     requestAnimationFrame(updateProgress);
 }
 
-// Continuously update
-updateProgress();
-
-// File upload handling
-let selectedFile = null;
+// ========================================
+// FILE UPLOAD
+// ========================================
 
 function handleFileSelect(event) {
     selectedFile = event.target.files[0];
@@ -752,7 +623,6 @@ function handleFileSelect(event) {
 
 async function uploadFile() {
     if (!selectedFile) return;
-    
     if (!currentUser) {
         showAuthModal();
         return;
@@ -763,7 +633,7 @@ async function uploadFile() {
     
     try {
         uploadBtn.disabled = true;
-        uploadBtn.textContent = 'Uploading...';
+        uploadBtn.textContent = '⏳ Caricamento...';
         
         const formData = new FormData();
         formData.append('file', selectedFile);
@@ -789,7 +659,7 @@ async function uploadFile() {
                 uploadBtn.disabled = true;
             }, 2000);
         } else {
-            throw new Error(result.error || 'Failed to upload');
+            throw new Error(result.error || 'Upload failed');
         }
     } catch (err) {
         console.error('Upload error:', err);
@@ -803,45 +673,10 @@ async function uploadFile() {
     }
 }
 
-// Event listeners per debug
-audio.addEventListener('waiting', () => {
-    if (isPlaying) {
-        statusDiv.className = 'status buffering';
-        statusDiv.textContent = 'Buffering...';
-    }
-});
+// ========================================
+// TRACKS MANAGEMENT
+// ========================================
 
-audio.addEventListener('playing', () => {
-    if (isPlaying) {
-        statusDiv.className = 'status live';
-        statusDiv.innerHTML = `<span class="live-indicator"></span>${t('live_status')}`;
-    }
-});
-
-audio.addEventListener('error', (e) => {
-    console.error('Errore audio:', e);
-    statusDiv.textContent = t('playback_error');
-    statusDiv.className = 'status';
-});
-
-window.addEventListener('DOMContentLoaded', function() {
-    console.log('🎵 Radio initialization...');
-    initHLS();
-    loadTracksList();
-});
-
-updateMetadata();
-setInterval(() => {
-    const hasOpenModal = document.querySelector('.auth-modal.active, .settings-modal.active, .change-credentials-modal.active, .confirm-overlay.active');
-    if (!hasOpenModal) {
-        updateMetadata();
-    }
-}, 5000);  // Update every 5 seconds
-
-// Tracks list management
-let allTracks = [];
-
-// Load tracks when modal is opened
 async function loadTracksList() {
     try {
         const response = await fetch(`${API_URL}/tracks`);
@@ -851,11 +686,10 @@ async function loadTracksList() {
         );
         renderTracksList();
     } catch (err) {
-        console.error('Error loading tracks:', err);
+        console.error('Tracks loading error:', err);
         const tracksList = document.getElementById('tracksList');
         if (tracksList) {
-            tracksList.innerHTML = 
-                `<div class="loading" style="color: red;">${t('tracks_loading_error')}</div>`;
+            tracksList.innerHTML = `<div class="loading" style="color: red;">${t('tracks_loading_error')}</div>`;
         }
     }
 }
@@ -870,8 +704,6 @@ function renderTracksList() {
 
     tracksList.innerHTML = allTracks.map((track, index) => {
         const duration = formatDuration(track.duration);
-        const inQueueBadge = '';
-        
         return `
             <div class="track-item">
                 <div class="track-info">
@@ -890,8 +722,7 @@ function renderTracksList() {
                             onclick="removeFromQueue(${index})"
                             title="${t('remove_from_queue_tooltip')}">
                         ${t('remove_from_queue')}
-                    </button>
-                    ` : ''}
+                    </button>` : ''}
                     <button class="remove-track-btn" 
                             onclick="removeTrack(${index})"
                             title="${t('delete_track_tooltip')}">
@@ -915,32 +746,31 @@ async function addTrackToQueue(trackIndex) {
     }
     
     const track = allTracks[trackIndex];
-    const filepath = track.filepath;
     
     try {
         const response = await authenticatedFetch(`${API_URL}/queue/add`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ filepath: filepath })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filepath: track.filepath })
         });
 
         const result = await response.json();
 
         if (result.success) {
-            // Updates infos
             track.in_queue = true;
             renderTracksList();
             setTimeout(() => loadTracksList(), 5000);
             updateMetadata();
+            
             const meta = result.metadata;
-            showConfirmDialog(t('success_title'), t('track_added_to_queue').replace('{artist}', meta.artist).replace('{title}', meta.title), 'success', false);
+            showConfirmDialog(t('success_title'), 
+                t('track_added_to_queue').replace('{artist}', meta.artist).replace('{title}', meta.title), 
+                'success', false);
         } else {
-            throw new Error(result.error || 'Failed to add to queue');
+            throw new Error(result.error || 'Errore aggiunta alla coda');
         }
     } catch (err) {
-        console.error('Error adding to queue:', err);
+        console.error('Queue add error:', err);
         showConfirmDialog(t('error_title'), t('queue_add_error').replace('{error}', err.message), 'confirm', false);
     }
 }
@@ -965,25 +795,18 @@ async function removeTrack(trackIndex) {
         'confirm'
     );
     
-    if (!confirmed) {
-        return;
-    }
-    
-    const filepath = track.filepath;
+    if (!confirmed) return;
     
     try {
         const response = await authenticatedFetch(`${API_URL}/track/remove`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ filepath: filepath })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filepath: track.filepath })
         });
 
         const result = await response.json();
 
         if (result.success) {
-            // Remove track from local list for instant update
             allTracks.splice(trackIndex, 1);
             renderTracksList();
             setTimeout(() => loadTracksList(), 5000);
@@ -992,35 +815,32 @@ async function removeTrack(trackIndex) {
             await showConfirmDialog(
                 t('delete_success_title'),
                 t('delete_success_message').replace('{track}', trackName),
-                'confirm',
-                false 
+                'confirm', false
             );
         } else {
             await showConfirmDialog(
                 t('delete_error_title'),
                 result.message || t('delete_error_message'),
-                'warning',
-                false  
+                'warning', false
             );
         }
     } catch (err) {
-        console.error('Error removing track:', err);
+        console.error('Track removal error:', err);
         await showConfirmDialog(
             t('connection_error_title'),
             t('connection_error_message').replace('{message}', err.message),
-            'warning',
-            false
+            'warning', false
         );
     }
 }
 
 async function removeFromQueue(trackIndex) {
-    // Auth check
     if (!currentUser) {
         showAuthModal();
         return;
     }
-        if (trackIndex < 0 || trackIndex >= allTracks.length) {
+    
+    if (trackIndex < 0 || trackIndex >= allTracks.length) {
         showConfirmDialog(t('error_title'), t('invalid_track_error'), 'confirm', false);
         return;
     }
@@ -1034,38 +854,36 @@ async function removeFromQueue(trackIndex) {
         'warning'
     );
     
-    if (!confirmed) {
-        return;
-    }
-    
-    const filepath = track.filepath;
+    if (!confirmed) return;
     
     try {
         const response = await authenticatedFetch(`${API_URL}/queue/remove`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ filepath: filepath })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filepath: track.filepath })
         });
 
         const result = await response.json();
 
         if (result.success) {
-            // Update local track info
             track.in_queue = false;
             renderTracksList();
             setTimeout(() => loadTracksList(), 5000);
             updateMetadata();
-            showConfirmDialog(t('success_title'), `${trackName} removed from queue`, 'success', false);
+            
+            showConfirmDialog(t('success_title'), `${trackName} rimosso dalla coda`, 'success', false);
         } else {
-            throw new Error(result.message || 'Error removing from queue');
+            throw new Error(result.message || 'Errore rimozione dalla coda');
         }
     } catch (err) {
-        console.error('Error removing from queue:', err);
+        console.error('Queue removal error:', err);
         showConfirmDialog(t('error_title'), t('queue_add_error').replace('{error}', err.message), 'confirm', false);
     }
 }
+
+// ========================================
+// UTILITIES
+// ========================================
 
 function formatDuration(seconds) {
     if (!seconds || seconds === 0) return '-';
@@ -1074,51 +892,74 @@ function formatDuration(seconds) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// === ESC KEY HANDLER ===
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        // Close auth modal if open
-        const authModal = document.getElementById('authModal');
-        if (authModal.classList.contains('active')) {
-            hideAuthModal();
-            return;
-        }
-        
-        // Close settings modal if open
-        const settingsModal = document.getElementById('settingsModal');
-        if (settingsModal.classList.contains('active')) {
-            hideSettingsModal();
-            return;
-        }
-        
-        // Close tracks modal if open
-        const tracksModal = document.getElementById('tracksModal');
-        if (tracksModal.classList.contains('active')) {
-            hideTracksModal();
-            return;
-        }
-        
-        // Close change credentials modal if open
-        const changeCredentialsModal = document.getElementById('changeCredentialsModal');
-        if (changeCredentialsModal.classList.contains('active')) {
-            hideChangeCredentialsModal();
-            return;
-        }
-        
-        // Close confirm dialog if open
-        const confirmOverlay = document.getElementById('confirmOverlay');
-        if (confirmOverlay.classList.contains('active')) {
-            closeConfirmDialog(false);
-            return;
-        }
-    }
-});
-
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-// Initialize authentication on page load
-checkAuthStatus();
+// ========================================
+// EVENT LISTENERS
+// ========================================
+
+audio.addEventListener('waiting', () => {
+    if (isPlaying) {
+        statusDiv.className = 'status buffering';
+        statusDiv.textContent = '⏳ Buffering...';
+    }
+});
+
+audio.addEventListener('playing', () => {
+    if (isPlaying) {
+        statusDiv.className = 'status live';
+        statusDiv.innerHTML = `<span class="live-indicator"></span>${t('live_status')}`;
+    }
+});
+
+audio.addEventListener('error', (e) => {
+    console.error('Audio error:', e);
+    statusDiv.textContent = t('playback_error');
+    statusDiv.className = 'status';
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        const modalsToCheck = [
+            { id: 'authModal', hide: hideAuthModal },
+            { id: 'settingsModal', hide: hideSettingsModal },
+            { id: 'tracksModal', hide: hideTracksModal },
+            { id: 'changeCredentialsModal', hide: hideChangeCredentialsModal },
+            { id: 'confirmOverlay', hide: () => closeConfirmDialog(false) }
+        ];
+        
+        for (const modal of modalsToCheck) {
+            if (document.getElementById(modal.id).classList.contains('active')) {
+                modal.hide();
+                return;
+            }
+        }
+    }
+});
+
+// ========================================
+// INITIALIZATION
+// ========================================
+
+window.addEventListener('DOMContentLoaded', () => {
+    console.log('🎵 Initializing radio...');
+    initHLS();
+    loadTracksList();
+    checkAuthStatus();
+});
+
+// Start metadata updates
+updateMetadata();
+updateProgress();
+
+// Update queue periodically (avoid when modals are open)
+setInterval(() => {
+    const hasOpenModal = document.querySelector('.auth-modal.active, .settings-modal.active, .change-credentials-modal.active, .confirm-overlay.active');
+    if (!hasOpenModal) {
+        updateMetadata();
+    }
+}, 5000);
