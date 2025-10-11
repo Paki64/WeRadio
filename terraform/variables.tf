@@ -18,6 +18,40 @@ variable "timezone" {
 
 
 
+# NGINX
+variable "nginx_config" {
+  description = "Nginx configuration name"
+  type        = string
+  default     = "nginx-config"
+}
+variable "nginx_name" {
+  description = "Nginx service name"
+  type        = string
+  default     = "nginx"
+}
+variable "nginx_image" {
+  description = "Nginx Docker image"
+  type        = string
+  default     = "nginx:alpine"
+}
+variable "nginx_port" {
+  description = "Nginx port"
+  type        = string
+  default     = "80"
+}
+variable "nginx_node_port" {
+  description = "Nginx NodePort for external access"
+  type        = string
+  default     = "30080"
+}
+variable "nginx_network_type" {
+  description = "Nginx network type"
+  type        = string
+  default     = "NodePort"
+}
+
+
+
 # BACKEND
 variable "backend_config" {
   description = "Backend service configuration name"
@@ -48,6 +82,16 @@ variable "backend_network_type" {
   description = "Backend network type"
   type        = string
   default     = "ClusterIP"
+}
+variable "backend_storage" {
+  description = "Backend storage size"
+  type        = string
+  default     = "5Gi"
+}
+variable "backend_storage_name" {
+  description = "Backend storage name"
+  type        = string
+  default     = "backend-storage"
 }
 
 # Streamer node
@@ -100,15 +144,12 @@ variable "frontend_port" {
 variable "api_url" {
   description = "API URL for frontend"
   type        = string
-  default     = "http://backend-api:5001"
+  default     = "/api"
 }
 variable "frontend_network_type" {
   description = "Frontend network type"
   type        = string
   default     = "ClusterIP"
-  # LoadBalancer suggested for cloud deployments
-  # NodePort suggested for local deployments (e.g., minikube, kind)
-  # ClusterIP suggested for use with an Ingress controller
 }
 
 

@@ -34,6 +34,24 @@ resource "kubernetes_secret" "backend_secret" {
   type = var.backend_secret_type
 }
 
+resource "kubernetes_persistent_volume_claim" "backend_pvc" {
+  metadata {
+    name      = var.backend_storage_name
+    namespace = var.namespace
+  }
+
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = var.backend_storage
+      }
+    }
+  }
+}
+
+# Backend Streamer
+
 
 
 # Backend Streamer
@@ -205,6 +223,18 @@ resource "kubernetes_deployment" "backend_streamer" {
             container_port = var.backend_streamer_port
           }
 
+          volume_mount {
+            name       = var.backend_storage_name
+            mount_path = "/app/data"
+          }
+
+        }
+
+        volume {
+          name = var.backend_storage_name
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.backend_pvc.metadata[0].name
+          }
         }
       
       }
@@ -404,6 +434,18 @@ resource "kubernetes_deployment" "backend_api" {
             }
           }
 
+          volume_mount {
+            name       = var.backend_storage_name
+            mount_path = "/app/data"
+          }
+
+        }
+
+        volume {
+          name = var.backend_storage_name
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.backend_pvc.metadata[0].name
+          }
         }
 
       }
