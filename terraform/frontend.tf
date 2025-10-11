@@ -95,3 +95,31 @@ resource "kubernetes_service" "frontend" {
     type = var.frontend_network_type
   }
 }
+
+
+
+resource "kubernetes_horizontal_pod_autoscaler_v2" "frontend_hpa" {
+  metadata {
+    name      = var.frontend_hpa
+    namespace = var.namespace
+  }
+  spec {
+    scale_target_ref {
+      api_version = "apps/v1"
+      kind        = "Deployment"
+      name        = var.frontend_name
+    }
+    min_replicas = var.frontend_min_replicas
+    max_replicas = var.frontend_max_replicas
+    metric {
+      type = "Resource"
+      resource {
+        name = "cpu"
+        target {
+          type                = "Utilization"
+          average_utilization = var.frontend_cpu_target
+        }
+      }
+    }
+  }
+}

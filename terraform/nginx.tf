@@ -140,3 +140,31 @@ resource "kubernetes_service" "nginx" {
     type = var.nginx_network_type
   }
 }
+
+
+
+resource "kubernetes_horizontal_pod_autoscaler_v2" "nginx_hpa" {
+  metadata {
+    name      = var.nginx_hpa
+    namespace = var.namespace
+  }
+  spec {
+    scale_target_ref {
+      api_version = "apps/v1"
+      kind        = "Deployment"
+      name        = var.nginx_name
+    }
+    min_replicas = var.nginx_min_replicas
+    max_replicas = var.nginx_max_replicas
+    metric {
+      type = "Resource"
+      resource {
+        name = "cpu"
+        target {
+          type                = "Utilization"
+          average_utilization = var.nginx_cpu_target
+        }
+      }
+    }
+  }
+}

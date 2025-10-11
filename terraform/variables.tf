@@ -49,6 +49,26 @@ variable "nginx_network_type" {
   type        = string
   default     = "NodePort"
 }
+variable "nginx_hpa" {
+  description = "Nginx HPA configuration"
+  type        = string
+  default     = "nginx-hpa"  
+}
+variable "nginx_min_replicas" {
+  description = "Minimum replicas for Nginx HPA"
+  type        = number
+  default     = 2
+}
+variable "nginx_max_replicas" {
+  description = "Maximum replicas for Nginx HPA"
+  type        = number
+  default     = 4
+}
+variable "nginx_cpu_target" {
+  description = "CPU target utilization percentage for Nginx HPA"
+  type        = number
+  default     = 75
+}
 
 
 
@@ -117,6 +137,32 @@ variable "backend_api_port" {
   type        = string
   default     = "5001"
 }
+variable "backend_api_hpa" {
+  description = "Backend API HPA configuration"
+  type        = string
+  default     = "backend-api-hpa"
+}
+variable "backend_api_min_replicas" {
+  description = "Minimum replicas for Backend API HPA"
+  type        = number
+  default     = 2
+}
+variable "backend_api_max_replicas" {
+  description = "Maximum replicas for Backend API HPA"
+  type        = number
+  default     = 7
+}
+variable "backend_api_cpu_target" {
+  description = "CPU target utilization percentage for Backend API HPA"
+  type        = number
+  default     = 60
+}
+variable "backend_api_mem_target" {
+  description = "Memory target utilization percentage for Backend API HPA"
+  type        = number
+  default     = 70
+
+}
 
 
 
@@ -150,6 +196,26 @@ variable "frontend_network_type" {
   description = "Frontend network type"
   type        = string
   default     = "ClusterIP"
+}
+variable "frontend_hpa" {
+  description = "Frontend HPA configuration"
+  type        = string
+  default     = "frontend-hpa"
+}
+variable "frontend_min_replicas" {
+  description = "Minimum replicas for Frontend HPA"
+  type        = number
+  default     = 2
+}
+variable "frontend_max_replicas" {
+  description = "Maximum replicas for Frontend HPA"
+  type        = number
+  default     = 4
+}
+variable "frontend_cpu_target" {
+  description = "CPU target utilization percentage for Frontend HPA"
+  type        = number
+  default     = 50
 }
 
 

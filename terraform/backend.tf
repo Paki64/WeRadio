@@ -50,8 +50,6 @@ resource "kubernetes_persistent_volume_claim" "backend_pvc" {
   }
 }
 
-# Backend Streamer
-
 
 
 # Backend Streamer
@@ -478,5 +476,43 @@ resource "kubernetes_service" "backend_api" {
     }
 
     type = var.backend_network_type
+  }
+}
+
+
+
+resource "kubernetes_horizontal_pod_autoscaler_v2" "backend_api_hpa" {
+  metadata {
+    name      = var.backend_api_hpa
+    namespace = var.namespace
+  }
+  spec {
+    scale_target_ref {
+      api_version = "apps/v1"
+      kind        = "Deployment"
+      name        = var.backend_api_name
+    }
+    min_replicas = var.backend_api_min_replicas
+    max_replicas = var.backend_api_max_replicas
+    metric {
+      type = "Resource"
+      resource {
+      name = "cpu"
+      target {
+        type                = "Utilization"
+        average_utilization = var.backend_api_cpu_target
+      }
+      }
+    }
+    metric {
+      type = "Resource"
+      resource {
+      name = "memory"
+      target {
+        type                = "Utilization"
+        average_utilization = var.backend_api_mem_target
+      }
+      }
+    }
   }
 }
