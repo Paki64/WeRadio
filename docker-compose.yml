@@ -1,7 +1,7 @@
 services:
-  # PostgreSQL Database
+  # PostgreSQL
   postgres:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     container_name: weradio-postgres
     environment:
       POSTGRES_DB: weradio
@@ -63,6 +63,7 @@ services:
 
   # Backend - Streamer Mode
   backend-streamer:
+    image: paki13/weradio-backend:latest
     build: ./backend
     container_name: weradio-backend-streamer
     ports:
@@ -95,6 +96,7 @@ services:
 
   # Backend - API-Only Mode
   backend-api:
+    image: paki13/weradio-backend:latest
     build: ./backend
     container_name: weradio-backend-api
     ports:
@@ -129,6 +131,7 @@ services:
 
   # Frontend
   frontend:
+    image: paki13/weradio-frontend:latest
     build: ./frontend
     container_name: weradio-frontend
     ports:
