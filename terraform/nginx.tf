@@ -93,6 +93,35 @@ resource "kubernetes_deployment" "nginx" {
           name  = var.nginx_name
           image = var.nginx_image
 
+          resources {
+            requests = {
+              cpu    = var.nginx_cpu_request
+              memory = var.nginx_mem_request
+            }
+            limits = {
+              cpu    = var.nginx_cpu_limit
+              memory = var.nginx_mem_limit
+            }
+          }
+
+          readiness_probe {
+            http_get {
+              path = "/"
+              port = var.nginx_port
+            }
+            initial_delay_seconds = 30
+            period_seconds        = 10
+          }
+
+          liveness_probe {
+            http_get {
+              path = "/"
+              port = var.nginx_port
+            }
+            initial_delay_seconds = 60
+            period_seconds        = 30
+          }
+
           port {
             container_port = var.nginx_port
           }
@@ -163,6 +192,16 @@ resource "kubernetes_horizontal_pod_autoscaler_v2" "nginx_hpa" {
         target {
           type                = "Utilization"
           average_utilization = var.nginx_cpu_target
+        }
+      }
+    }
+    metric {
+      type = "Resource"
+      resource {
+        name = "memory"
+        target {
+          type                = "Utilization"
+          average_utilization = var.nginx_mem_target
         }
       }
     }

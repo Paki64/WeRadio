@@ -88,6 +88,17 @@ resource "kubernetes_deployment" "minio" {
             value = var.timezone
           }
 
+          resources {
+            requests = {
+              cpu    = var.minio_cpu_request
+              memory = var.minio_mem_request
+            }
+            limits = {
+              cpu    = var.minio_cpu_limit
+              memory = var.minio_mem_limit
+            }
+          }
+
           port {
             container_port = var.minio_api_port
           }

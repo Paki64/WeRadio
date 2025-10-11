@@ -61,6 +61,35 @@ resource "kubernetes_deployment" "frontend" {
             }
           }
 
+          resources {
+            requests = {
+              cpu    = var.frontend_cpu_request
+              memory = var.frontend_mem_request
+            }
+            limits = {
+              cpu    = var.frontend_cpu_limit
+              memory = var.frontend_mem_limit
+            }
+          }
+
+          readiness_probe {
+            http_get {
+              path = "/"
+              port = var.frontend_port
+            }
+            initial_delay_seconds = 30
+            period_seconds        = 10
+          }
+
+          liveness_probe {
+            http_get {
+              path = "/"
+              port = var.frontend_port
+            }
+            initial_delay_seconds = 60
+            period_seconds        = 30
+          }
+
           port {
             container_port = var.frontend_port
           }
@@ -118,6 +147,16 @@ resource "kubernetes_horizontal_pod_autoscaler_v2" "frontend_hpa" {
         target {
           type                = "Utilization"
           average_utilization = var.frontend_cpu_target
+        }
+      }
+    }
+    metric {
+      type = "Resource"
+      resource {
+        name = "memory"
+        target {
+          type                = "Utilization"
+          average_utilization = var.frontend_mem_target
         }
       }
     }

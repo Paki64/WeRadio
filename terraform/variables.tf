@@ -49,6 +49,26 @@ variable "nginx_network_type" {
   type        = string
   default     = "NodePort"
 }
+variable "nginx_cpu_request" {
+  description = "CPU request for Nginx"
+  type        = string
+  default     = "100m"
+}
+variable "nginx_mem_request" {
+  description = "Memory request for Nginx"
+  type        = string
+  default     = "128Mi"
+}
+variable "nginx_cpu_limit" {
+  description = "CPU limit for Nginx"
+  type        = string
+  default     = "500m"
+}
+variable "nginx_mem_limit" {
+  description = "Memory limit for Nginx"
+  type        = string
+  default     = "512Mi"
+}
 variable "nginx_hpa" {
   description = "Nginx HPA configuration"
   type        = string
@@ -68,6 +88,11 @@ variable "nginx_cpu_target" {
   description = "CPU target utilization percentage for Nginx HPA"
   type        = number
   default     = 75
+}
+variable "nginx_mem_target" {
+  description = "Memory target utilization percentage for Nginx HPA"
+  type        = number
+  default     = 70
 }
 
 
@@ -125,6 +150,26 @@ variable "backend_streamer_port" {
   type        = string
   default     = "5000"
 }
+variable "backend_streamer_cpu_request" {
+  description = "CPU request for backend streamer"
+  type        = string
+  default     = "100m"
+}
+variable "backend_streamer_mem_request" {
+  description = "Memory request for backend streamer"
+  type        = string
+  default     = "128Mi"
+}
+variable "backend_streamer_cpu_limit" {
+  description = "CPU limit for backend streamer"
+  type        = string
+  default     = "500m"
+}
+variable "backend_streamer_mem_limit" {
+  description = "Memory limit for backend streamer"
+  type        = string
+  default     = "512Mi"
+}
 
 # API node
 variable "backend_api_name" {
@@ -136,6 +181,26 @@ variable "backend_api_port" {
   description = "Backend API port"
   type        = string
   default     = "5001"
+}
+variable "backend_api_cpu_request" {
+  description = "CPU request for backend API"
+  type        = string
+  default     = "100m"
+}
+variable "backend_api_mem_request" {
+  description = "Memory request for backend API"
+  type        = string
+  default     = "128Mi"
+}
+variable "backend_api_cpu_limit" {
+  description = "CPU limit for backend API"
+  type        = string
+  default     = "500m"
+}
+variable "backend_api_mem_limit" {
+  description = "Memory limit for backend API"
+  type        = string
+  default     = "512Mi"
 }
 variable "backend_api_hpa" {
   description = "Backend API HPA configuration"
@@ -161,7 +226,6 @@ variable "backend_api_mem_target" {
   description = "Memory target utilization percentage for Backend API HPA"
   type        = number
   default     = 70
-
 }
 
 
@@ -197,6 +261,26 @@ variable "frontend_network_type" {
   type        = string
   default     = "ClusterIP"
 }
+variable "frontend_cpu_request" {
+  description = "CPU request for frontend"
+  type        = string
+  default     = "100m"
+}
+variable "frontend_mem_request" {
+  description = "Memory request for frontend"
+  type        = string
+  default     = "128Mi"
+}
+variable "frontend_cpu_limit" {
+  description = "CPU limit for frontend"
+  type        = string
+  default     = "500m"
+}
+variable "frontend_mem_limit" {
+  description = "Memory limit for frontend"
+  type        = string
+  default     = "1024Mi"
+}
 variable "frontend_hpa" {
   description = "Frontend HPA configuration"
   type        = string
@@ -217,6 +301,11 @@ variable "frontend_cpu_target" {
   type        = number
   default     = 50
 }
+variable "frontend_mem_target" {
+  description = "Memory target utilization percentage for Frontend HPA"
+  type        = number
+  default     = 70
+}
 
 
 
@@ -230,7 +319,6 @@ variable "postgres_name" {
   description = "PostgreSQL service name"
   type        = string
   default     = "postgres"
-  
 }
 variable "postgres_image" {
   description = "PostgreSQL Docker image"
@@ -297,6 +385,26 @@ variable "postgres_network_type" {
   type        = string
   default     = "ClusterIP"
 }
+variable "postgres_cpu_request" {
+  description = "CPU request for PostgreSQL"
+  type        = string
+  default     = "100m"
+}
+variable "postgres_mem_request" {
+  description = "Memory request for PostgreSQL"
+  type        = string
+  default     = "256Mi"
+}
+variable "postgres_cpu_limit" {
+  description = "CPU limit for PostgreSQL"
+  type        = string
+  default     = "1000m"
+}
+variable "postgres_mem_limit" {
+  description = "Memory limit for PostgreSQL"
+  type        = string
+  default     = "1024Mi"
+}
 
 
 
@@ -355,6 +463,26 @@ variable "redis_storage_name" {
   description = "Redis storage name"
   type        = string
   default     = "redis-storage"
+}
+variable "redis_cpu_request" {
+  description = "CPU request for Redis"
+  type        = string
+  default     = "100m"
+}
+variable "redis_mem_request" {
+  description = "Memory request for Redis"
+  type        = string
+  default     = "128Mi"
+}
+variable "redis_cpu_limit" {
+  description = "CPU limit for Redis"
+  type        = string
+  default     = "500m"
+}
+variable "redis_mem_limit" {
+  description = "Memory limit for Redis"
+  type        = string
+  default     = "512Mi"
 }
 
 
@@ -433,4 +561,24 @@ variable "minio_network_type" {
   description = "MinIO network type"
   type        = string
   default     = "ClusterIP"
+}
+variable "minio_cpu_request" {
+  description = "CPU request for MinIO"
+  type        = string
+  default     = "100m"
+}
+variable "minio_mem_request" {
+  description = "Memory request for MinIO"
+  type        = string
+  default     = "256Mi"
+}
+variable "minio_cpu_limit" {
+  description = "CPU limit for MinIO"
+  type        = string
+  default     = "1000m"
+}
+variable "minio_mem_limit" {
+  description = "Memory limit for MinIO"
+  type        = string
+  default     = "1024Mi"
 }

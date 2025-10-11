@@ -217,8 +217,37 @@ resource "kubernetes_deployment" "backend_streamer" {
             }
           }
 
+          resources {
+            requests = {
+              cpu    = var.backend_streamer_cpu_request
+              memory = var.backend_streamer_mem_request
+            }
+            limits = {
+              cpu    = var.backend_streamer_cpu_limit
+              memory = var.backend_streamer_mem_limit
+            }
+          }
+
           port {
             container_port = var.backend_streamer_port
+          }
+
+          readiness_probe {
+            http_get {
+              path = "/"
+              port = var.backend_streamer_port
+            }
+            initial_delay_seconds = 30
+            period_seconds        = 10
+          }
+
+          liveness_probe {
+            http_get {
+              path = "/"
+              port = var.backend_streamer_port
+            }
+            initial_delay_seconds = 60
+            period_seconds        = 30
           }
 
           volume_mount {
@@ -430,6 +459,35 @@ resource "kubernetes_deployment" "backend_api" {
                 key  = "MINIO_SECRET_KEY"
               }
             }
+          }
+
+          resources {
+            requests = {
+              cpu    = var.backend_api_cpu_request
+              memory = var.backend_api_mem_request
+            }
+            limits = {
+              cpu    = var.backend_api_cpu_limit
+              memory = var.backend_api_mem_limit
+            }
+          }
+
+          readiness_probe {
+            http_get {
+              path = "/"
+              port = var.backend_api_port
+            }
+            initial_delay_seconds = 30
+            period_seconds        = 10
+          }
+
+          liveness_probe {
+            http_get {
+              path = "/min"
+              port = var.backend_api_port
+            }
+            initial_delay_seconds = 60
+            period_seconds        = 30
           }
 
           volume_mount {

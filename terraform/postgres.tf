@@ -107,6 +107,17 @@ resource "kubernetes_deployment" "postgres" {
             value = var.postgres_lc_all
           }
 
+          resources {
+            requests = {
+              cpu    = var.postgres_cpu_request
+              memory = var.postgres_mem_request
+            }
+            limits = {
+              cpu    = var.postgres_cpu_limit
+              memory = var.postgres_mem_limit
+            }
+          }
+
           port {
             container_port = var.postgres_port
           }

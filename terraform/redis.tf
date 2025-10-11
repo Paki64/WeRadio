@@ -77,6 +77,17 @@ resource "kubernetes_deployment" "redis" {
             value = var.timezone
           }
 
+          resources {
+            requests = {
+              cpu    = var.redis_cpu_request
+              memory = var.redis_mem_request
+            }
+            limits = {
+              cpu    = var.redis_cpu_limit
+              memory = var.redis_mem_limit
+            }
+          }
+
           port {
             container_port = var.redis_port
           }
