@@ -73,7 +73,7 @@ def create_app():
         )
         user_repo = UserRepository(db_manager)
         
-        # Inizializza auth nelle routes
+        # Init auth routes
         init_auth(auth_service, user_repo)
         
         # Set global auth service for lazy decorators

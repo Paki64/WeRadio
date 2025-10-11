@@ -334,32 +334,6 @@ def update_profile():
     return jsonify(response)
 
 
-# TODO: Test if needed
-@auth_bp.route('/logout', methods=['POST'])
-def logout():
-    """
-    Logout endpoint
-    
-    Response:
-        {
-            "success": true,
-            "message": "Logged out successfully"
-        }
-    """
-    # Con JWT non c'è molto da fare server-side
-    # Il token viene semplicemente rimosso dal client
-    
-    # Se vuoi implementare una blacklist dei token:
-    # - Salva token in Redis/DB con TTL
-    # - Verifica nella validazione se il token è blacklisted
-    
-    logger.info("User logged out")
-    
-    return jsonify({
-        'success': True,
-        'message': 'Logged out successfully'
-    })
-
 
 # === ADMIN ROUTES ===
 
