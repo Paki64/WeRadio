@@ -334,6 +334,14 @@ async function handleChangeCredentials(event) {
     if (newEmail) updateData.email = newEmail;
     if (newPassword) updateData.password = newPassword;
     
+    // Check if at least one field is provided
+    if (Object.keys(updateData).length === 0) {
+        messageDiv.innerHTML = `<div class="auth-error">${t('no_changes_error')}</div>`;
+        submitBtn.disabled = false;
+        submitBtn.textContent = t('update_button');
+        return;
+    }
+    
     try {
         const response = await fetch(`${API_URL}/auth/profile`, {
             method: 'PUT',
@@ -753,7 +761,7 @@ function handleFileSelect(event) {
         fileLabel.textContent = `📁 ${selectedFile.name}`;
         uploadBtn.disabled = false;
     } else {
-        fileLabel.textContent = '📁 Scegli un file audio';
+        fileLabel.textContent = t('choose_file');
         uploadBtn.disabled = true;
     }
 }
@@ -784,8 +792,8 @@ async function uploadFile() {
         const result = await response.json();
         
         if (result.success) {
-            uploadBtn.textContent = '✅ Caricato!';
-            document.getElementById('fileLabel').textContent = '📁 Scegli un file audio';
+            uploadBtn.textContent = t('upload_success_button');
+            document.getElementById('fileLabel').textContent = t('choose_file');
             document.getElementById('audioFile').value = '';
             selectedFile = null;
             
@@ -804,7 +812,7 @@ async function uploadFile() {
         }
     } catch (err) {
         console.error('Errore upload:', err);
-        uploadBtn.textContent = '❌ Errore';
+        uploadBtn.textContent = t('upload_error_button');
         showConfirmDialog(t('error_title'), t('upload_error_generic').replace('{error}', err.message), 'confirm', false);
         
         setTimeout(() => {
@@ -831,7 +839,7 @@ audio.addEventListener('playing', () => {
 
 audio.addEventListener('error', (e) => {
     console.error('Errore audio:', e);
-    statusDiv.textContent = 'Errore riproduzione';
+    statusDiv.textContent = t('playback_error');
     statusDiv.className = 'status';
 });
 
@@ -990,8 +998,8 @@ async function removeTrack(trackIndex) {
     
     // Conferma rimozione con dialog personalizzato
     const confirmed = await showConfirmDialog(
-        '🗑️ Elimina Brano',
-        `Vuoi eliminare definitivamente questo brano?\n\n${trackName}\n\n⚠️ Questa azione è irreversibile!\nIl file verrà eliminato definitivamente dalla libreria.`,
+        t('confirm_delete_track_title'),
+        t('confirm_delete_track_message').replace('{track}', trackName),
         'confirm'
     );
     
@@ -1027,16 +1035,16 @@ async function removeTrack(trackIndex) {
             
             // Mostra notifica di successo
             await showConfirmDialog(
-                '✅ Brano Eliminato',
-                `${trackName} è stato eliminato definitivamente dalla libreria.`,
+                t('delete_success_title'),
+                t('delete_success_message').replace('{track}', trackName),
                 'confirm',
                 false  // Solo pulsante OK
             );
         } else {
             // Mostra errore specifico dall'API con dialog
             await showConfirmDialog(
-                '❌ Impossibile Eliminare',
-                result.message || 'Errore rimozione brano',
+                t('delete_error_title'),
+                result.message || t('delete_error_message'),
                 'warning',
                 false  // Solo pulsante OK
             );
@@ -1045,8 +1053,8 @@ async function removeTrack(trackIndex) {
         console.error('Errore rimozione brano:', err);
         // Mostra errore di connessione con dialog
         await showConfirmDialog(
-            '❌ Errore di Connessione',
-            `Non è stato possibile contattare il server.\n\n${err.message}`,
+            t('connection_error_title'),
+            t('connection_error_message').replace('{message}', err.message),
             'warning',
             false  // Solo pulsante OK
         );
@@ -1071,8 +1079,8 @@ async function removeFromQueue(trackIndex) {
     
     // Conferma rimozione dalla coda con dialog personalizzato
     const confirmed = await showConfirmDialog(
-        '➖ Rimuovi dalla Coda',
-        `Vuoi rimuovere questo brano dalla coda?\n\n${trackName}\n\n(Il file rimarrà nella libreria)`,
+        t('confirm_remove_from_queue_title'),
+        t('confirm_remove_from_queue_message').replace('{track}', trackName),
         'warning'
     );
     

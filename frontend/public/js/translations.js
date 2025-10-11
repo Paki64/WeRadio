@@ -49,6 +49,7 @@ const translations = {
     "settings_title": "Settings",
     "auth_title": "Authentication",
     "confirm_title": "Confirm",
+    "confirm_remove_from_queue_title": "➖ Remove from Queue",
     "error_title": "Error",
     "success_title": "Success",
 
@@ -83,11 +84,13 @@ const translations = {
 
     // Messages
     "login_required": "Login required for this feature",
+    "confirm_remove_from_queue_message": "Do you want to remove this track from the queue?\n\n{track}\n\n(The file will not be deleted)",
 
     // Error/success messages
     "login_success": "Login successful!",
     "register_success": "Registration completed!",
     "upload_success": "Track uploaded successfully!",
+    "upload_success_button": "Uploaded!",
     "delete_success": "Track deleted successfully!",
     "generic_error": "An error occurred",
     "connection_error": "Connection error",
@@ -110,8 +113,19 @@ const translations = {
     "track_deleted_success": "Track deleted successfully!",
     "confirm_delete_track": "Are you sure you want to permanently delete this track?",
 
-    // Tooltips
-    "settings_tooltip": "Settings",
+    // Confirm delete track
+    "confirm_delete_track_title": "🗑️ Remove track",
+    "confirm_delete_track_message": "Do you want to permanently delete this track?\n\n{track}\n\nThis action is irreversible!",
+
+    // Delete success/error
+    "delete_success_title": "✅ Track Deleted",
+    "delete_success_message": "{track} has been permanently removed from the library.",
+        "delete_error_title": "❌ Unable to Delete",
+    "upload_error_button": "❌ Error",
+    "playback_error": "Playback error",
+    "connection_error_title": "❌ Connection Error",
+    "connection_error_message": "Unable to contact the server.\n\n{message}",
+    "delete_error_message": "Error deleting track",
 
     // Confirmations
     "confirm_logout": "Are you sure you want to log out?",
@@ -130,6 +144,7 @@ const translations = {
     "welcome_message": "Welcome, {username}!",
     "credentials_updated": "Credentials updated successfully!",
     "update_error": "Error during update",
+    "no_changes_error": "Please enter at least one value to update.",
     "connection_error": "Connection error",
     "live_status": "LIVE",
     "click_to_listen": "<strong>Click \"LISTEN LIVE\"</strong> to start",
