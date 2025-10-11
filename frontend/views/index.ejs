@@ -20,7 +20,7 @@
                          onload="document.getElementById('logo-fallback').style.display='none';" />
                     <h1 id="logo-fallback">📻 <%= t('app_title') %></h1>
                 </div>
-                <button class="settings-btn" onclick="showSettings()" title="<%= t('settings_tooltip') %>"><%= t('settings_button') %></button>
+                <img src="/images/settings.svg" onclick="showSettings()" class="settings-icon" title="<%= t('settings_tooltip') %>" alt="Settings" />
             </div>
             <p><%= t('app_subtitle') %></p>
         </div>
@@ -54,7 +54,7 @@
         </div>
 
         <div class="volume-control">
-            <label for="volume"><%= t('volume_label') %></label>
+            <label for="volume"><img src="/images/volume.svg" alt="Volume" class="volume-icon" /> <%= t('volume_label') %></label>
             <input type="range" id="volume" min="0" max="100" value="70" oninput="setVolume(this.value)">
         </div>
 

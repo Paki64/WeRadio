@@ -1,31 +1,19 @@
+# Terraform
 terraform.tfstate
 terraform.tfstate.backup
 .terraform
 .terraform.lock.hcl
 
-todo.txt
-
-# Backend data directories
+# Backend
 backend/data
+backend/logs
 backend/__pycache__
 backend/*/__pycache__/
 backend/.env
 
-# MinIO data
-minio/
-postgres/
-redis/
-
 # Frontend 
 frontend/node_modules
 frontend/.env
-frontend/images
-frontend/favicon.ico
-frontend/favicon.svg
-
-# Data
-data
-logs
 
 # System files
 .DS_Store

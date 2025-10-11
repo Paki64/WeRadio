@@ -699,8 +699,7 @@ async function updateMetadata() {
         if (data.next_track) {
             nextTrackDiv.style.display = 'block';
             const nextText = `${data.next_track.artist} - ${data.next_track.title}`;
-            const badge = data.next_track.from_queue ? ' 🎵' : '';
-            nextTrackInfo.textContent = nextText + badge;
+            nextTrackInfo.textContent = nextText;
         } else {
             nextTrackDiv.style.display = 'none';
         }

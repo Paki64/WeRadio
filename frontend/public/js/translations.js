@@ -3,17 +3,17 @@ const translations = {
     "app_title": "WeRadio",
     "app_subtitle": "HLS Live Streaming",
     "now_playing": "Loading...",
-    "next_track": "⏭️ Next track:",
-    "volume_label": "🔊 Volume",
-    "upload_section_title": "🎵 Upload a Track",
-    "tracks_section_title": "🎵 Music Library",
-    "queue_section_title": "📋 Playback Queue",
-    "tracks_modal_title": "🎵 Music Library",
+    "next_track": "Next track:",
+    "volume_label": "Volume",
+    "upload_section_title": "Upload a Track",
+    "tracks_section_title": "Music Library",
+    "queue_section_title": "Playback Queue",
+    "tracks_modal_title": "Music Library",
 
     // Buttons
     "settings_button": "⚙️",
-    "play_button": "▶️ LISTEN LIVE",
-    "upload_button": "⬆️ Upload new track",
+    "play_button": "LISTEN LIVE",
+    "upload_button": "Upload new track",
     "show_tracks_button": "Show",
     "close_button": "Close",
     "confirm_button": "Confirm",
@@ -27,7 +27,7 @@ const translations = {
     "loading": "Loading...",
     "loading_tracks": "Loading tracks...",
     "loading_queue": "Loading queue...",
-    "click_to_start": "👇 Click to start listening",
+    "click_to_start": "Click to start listening",
     "no_tracks_available": "No tracks available",
     "no_queue": "No tracks in queue",
     "unknown_artist": "Unknown",
@@ -39,11 +39,11 @@ const translations = {
     "remove_from_queue_tooltip": "Remove from queue",
     "delete_track_tooltip": "Delete track permanently",
     "tracks_loading_error": "Error loading tracks",
-    "queue_title": "📋 Playback queue:",
+    "queue_title": "Playback queue:",
     "track_in_queue": "In queue",
 
     // File input
-    "choose_file": "📁 Choose an audio file",
+    "choose_file": "Choose an audio file",
 
     // Modal titles
     "settings_title": "Settings",
@@ -74,7 +74,7 @@ const translations = {
     // Buttons
     "login_button_text": "Login",
     "register_button_text": "Register",
-    "save_profile_button": "💾 Save Profile",
+    "save_profile_button": "Save Profile",
     "change_credentials_button": "Change Credentials",
     "cancel_button": "Cancel",
 
@@ -102,12 +102,12 @@ const translations = {
     "uploading_text": "Uploading...",
 
     // Notification messages
-    "track_added_to_queue": "✅ Added to queue!\n\n{artist} - {title}\n",
-    "queue_add_error": "❌ Error: {error}",
-    "track_removed_from_queue": "✅ {message}\n\n{trackName} removed from queue",
-    "invalid_track_error": "❌ Error: Invalid track",
-    "upload_error_generic": "❌ Error: {error}",
-    "track_deleted_success": "✅ Track deleted successfully!",
+    "track_added_to_queue": " Added to queue!\n\n{artist} - {title}\n",
+    "queue_add_error": "Error: {error}",
+    "track_removed_from_queue": "{message}\n\n{trackName} removed from queue",
+    "invalid_track_error": "Error: Invalid track",
+    "upload_error_generic": "Error: {error}",
+    "track_deleted_success": "Track deleted successfully!",
     "confirm_delete_track": "Are you sure you want to permanently delete this track?",
 
     // Tooltips
@@ -132,7 +132,7 @@ const translations = {
     "update_error": "Error during update",
     "connection_error": "Connection error",
     "live_status": "LIVE",
-    "click_to_listen": "👆 <strong>Click \"LISTEN LIVE\"</strong> to start",
+    "click_to_listen": "<strong>Click \"LISTEN LIVE\"</strong> to start",
     "no_account": "Don't have an account? <a onclick=\"switchAuthTab('register')\">Register</a>",
     "have_account": "Already have an account? <a onclick=\"switchAuthTab('login')\">Login</a>",
     "updating_text": "Updating...",
@@ -140,10 +140,10 @@ const translations = {
     "reconnecting": "⚠️ Reconnecting...",
     "connection_error_status": "Connection error",
     "auto_starting": "⏳ Auto-starting...",
-    "pause_button": "⏸️ PAUSE",
+    "pause_button": "PAUSE",
     "connecting": "⏳ Connecting...",
     "error_prefix": "Error: ",
-    "play_button": "▶️ LISTEN LIVE",
+    "play_button": "LISTEN LIVE",
     "stream_stopped": "Stream stopped"
 };
 

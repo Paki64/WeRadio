@@ -682,6 +682,32 @@ button {
     box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
+.settings-icon {
+    width: 48px;
+    height: 48px;
+    color: var(--primary-color);
+    cursor: pointer;
+    transition: all 0.3s;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.settings-icon:hover {
+    transform: scale(1.1);
+    color: var(--primary-dark);
+}
+
+.volume-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 5px;
+    vertical-align: middle;
+    color: var(--text-secondary);
+}
+
 /* Authentication Styles */
 .auth-section {
     position: absolute;
