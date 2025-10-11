@@ -481,19 +481,18 @@ audio.volume = 0.7;
 function initHLS() {
     if (Hls.isSupported()) {
         hls = new Hls({
-            // CONFIGURAZIONE: Aspetta 2 segmenti prima di partire
+            
             maxBufferLength: 30,
             maxMaxBufferLength: 60,
             maxBufferSize: 60 * 1000 * 1000,
             maxBufferHole: 0.5,
-            
-            // Inizia 3 segmenti indietro per sicurezza
-            liveSyncDuration: 3,
-            liveMaxLatencyDuration: 30,
+            startFragPrefetch: true,
+
+            liveSyncDuration: 2,
+            liveMaxLatencyDuration: 15,
             liveDurationInfinity: true,
             liveBackBufferLength: 0,
             
-            // Caricamento aggressivo
             manifestLoadingTimeOut: 5000,
             manifestLoadingMaxRetry: 15,
             manifestLoadingRetryDelay: 200,
@@ -502,7 +501,6 @@ function initHLS() {
             fragLoadingTimeOut: 10000,
             fragLoadingMaxRetry: 15,
             
-            // Buffer management
             maxBufferHole: 0.1,
             nudgeOffset: 0.1,
             nudgeMaxRetry: 15,
@@ -516,9 +514,6 @@ function initHLS() {
             autoStartLoad: true,
             testBandwidth: false,
             
-            // CHIAVE: Aspetta di avere 2 segmenti (12s) prima di iniziare
-            startFragPrefetch: true,
-            
             // Buffer management
             lowLatencyMode: false,
             backBufferLength: 0,
@@ -531,36 +526,34 @@ function initHLS() {
         hls.attachMedia(audio);
         
         hls.on(Hls.Events.MANIFEST_PARSED, function() {
-            console.log('✓ HLS manifest caricato');
-            // Avvia automaticamente la riproduzione quando il manifest è pronto
+            console.log('HLS manifest parsed, ready to play');
             autoplayStream();
         });
         
         hls.on(Hls.Events.ERROR, function(event, data) {
             console.warn('HLS Event:', data.type, data.details);
             
-            // Gestisci buffer stalled senza fermare tutto (NON è fatale)
             if (data.details === 'bufferStalledError') {
-                console.log('⏳ Buffer stalled, aspettando più dati...');
-                return; // Non fatale, aspetta semplicemente
+                console.log('Buffer stalled, waiting for more data...');
+                return;
             }
             
             if (data.fatal) {
-                console.error('Errore HLS fatale:', data);
-                
+                console.error('Fatal HLS error:', data);
+
                 switch(data.type) {
                     case Hls.ErrorTypes.NETWORK_ERROR:
-                        console.log('Errore di rete, tentativo di recovery...');
+                        console.log('Network error, attempting recovery...');
                         statusDiv.textContent = t('reconnecting');
                         statusDiv.className = 'status buffering';
                         hls.startLoad();
                         break;
                     case Hls.ErrorTypes.MEDIA_ERROR:
-                        console.log('Errore media, tentativo di recovery...');
+                        console.log('Media error, attempting recovery...');
                         hls.recoverMediaError();
                         break;
                     default:
-                        console.log('Errore irreversibile');
+                        console.log('Irrecoverable error');
                         statusDiv.textContent = t('connection_error_status');
                         statusDiv.className = 'status';
                         // Prova a ricreare tutto
@@ -577,7 +570,7 @@ function initHLS() {
         
         // Log quando il buffer è pronto
         hls.on(Hls.Events.FRAG_BUFFERED, function(event, data) {
-            console.log('✓ Segmento bufferizzato:', data.frag.sn);
+            console.log('Fragment buffered:', data.frag.sn);
         });
         
         hls.on(Hls.Events.FRAG_LOADED, function() {
@@ -588,9 +581,7 @@ function initHLS() {
         });
         
     } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-        // Safari supporto nativo HLS
         audio.src = `${API_URL}/playlist.m3u8`;
-        // Avvia automaticamente su Safari
         audio.addEventListener('loadedmetadata', function() {
             autoplayStream();
         });
@@ -605,18 +596,17 @@ function autoplayStream() {
         .then(() => {
             isPlaying = true;
             playBtn.textContent = t('pause_button');
-            playBtn.style.animation = 'none'; // Rimuovi animazione
+            playBtn.style.animation = 'none';
             statusDiv.className = 'status live';
             statusDiv.innerHTML = `<span class="live-indicator"></span>${t('live_status')}`;
-            console.log('✓ Autoplay avviato');
+            console.log('Starting autoplay');
             updateMetadata();
         })
         .catch(err => {
-            // Se l'autoplay fallisce (policy del browser), mostra il pulsante
-            console.warn('Autoplay bloccato dal browser:', err);
+            console.warn('Autoplay is disabled by browser:', err);
             statusDiv.innerHTML = t('click_to_listen');
             statusDiv.className = 'status';
-            playBtn.style.animation = 'pulse 2s infinite'; // Anima il pulsante
+            playBtn.style.animation = 'pulse 2s infinite'; 
         });
 }
 
@@ -631,7 +621,6 @@ function togglePlay() {
 function startStream() {
     if (!hls) {
         initHLS();
-        // Aspetta un attimo che HLS si inizializzi
         setTimeout(() => {
             attemptPlay();
         }, 500);
@@ -643,7 +632,7 @@ function startStream() {
 function attemptPlay() {
     statusDiv.className = 'status buffering';
     statusDiv.textContent = t('connecting');
-    playBtn.style.animation = 'none'; // Rimuovi animazione
+    playBtn.style.animation = 'none';
     
     audio.play()
         .then(() => {
@@ -671,22 +660,20 @@ function setVolume(value) {
     audio.volume = value / 100;
 }
 
-// Variabili per tracciare la durata del brano
+// Track progress data
 let currentTrackDuration = 0;
-let serverCurrentTime = 0;  // Tempo dal server
-let lastUpdateTime = 0;     // Timestamp dell'ultimo aggiornamento
+let serverCurrentTime = 0;
+let lastUpdateTime = 0;  
 
 async function updateMetadata() {
     try {
         const response = await fetch(`${API_URL}/status`);
         const data = await response.json();
         
-        // Aggiorna brano corrente (usa titolo, non filename)
         if (data.metadata) {
             const newTitle = data.metadata.title || 'Unknown';
             const currentTitle = document.getElementById('track-title').textContent;
             
-            // Se il brano è cambiato, resetta
             if (newTitle !== currentTitle) {
                 currentTrackDuration = data.metadata.duration || 0;
             }
@@ -694,14 +681,13 @@ async function updateMetadata() {
             document.getElementById('track-title').textContent = newTitle;
             document.getElementById('track-artist').textContent = data.metadata.artist || 'Unknown';
             
-            // Aggiorna tempo corrente dal server
             if (data.current_time !== undefined) {
                 serverCurrentTime = data.current_time;
                 lastUpdateTime = Date.now();
             }
         }
         
-        // Aggiorna prossimo brano
+        // Next track
         const nextTrackDiv = document.getElementById('nextTrack');
         const nextTrackInfo = document.getElementById('next-track-info');
         if (data.next_track) {
@@ -712,7 +698,7 @@ async function updateMetadata() {
             nextTrackDiv.style.display = 'none';
         }
         
-        // Aggiorna coda
+        // Update queue
         const queueList = document.getElementById('queueList');
         if (data.queue && data.queue.length > 0) {
             queueList.innerHTML = data.queue.map((queueItem, index) => {
@@ -732,24 +718,22 @@ async function updateMetadata() {
     }
 }
 
-// Aggiorna progress bar ogni frame
+// Progress bar update
 function updateProgress() {
     if (isPlaying && currentTrackDuration > 0) {
-        // Calcola tempo corrente: tempo dal server + tempo trascorso dall'ultimo aggiornamento
         const timeSinceUpdate = (Date.now() - lastUpdateTime) / 1000;
         const currentTime = Math.min(serverCurrentTime + timeSinceUpdate, currentTrackDuration);
         const percentage = (currentTime / currentTrackDuration) * 100;
         
         document.getElementById('progressFill').style.width = `${percentage}%`;
     }
-    
     requestAnimationFrame(updateProgress);
 }
 
-// Avvia l'aggiornamento continuo della progress bar
+// Continuously update
 updateProgress();
 
-// File upload functions
+// File upload handling
 let selectedFile = null;
 
 function handleFileSelect(event) {
@@ -779,7 +763,7 @@ async function uploadFile() {
     
     try {
         uploadBtn.disabled = true;
-        uploadBtn.textContent = '⏳ Caricamento...';
+        uploadBtn.textContent = 'Uploading...';
         
         const formData = new FormData();
         formData.append('file', selectedFile);
@@ -797,10 +781,7 @@ async function uploadFile() {
             document.getElementById('audioFile').value = '';
             selectedFile = null;
             
-            // Aggiorna metadata per mostrare la coda
             updateMetadata();
-            
-            // Aggiorna la libreria musicale
             await loadTracksList();
             
             setTimeout(() => {
@@ -808,10 +789,10 @@ async function uploadFile() {
                 uploadBtn.disabled = true;
             }, 2000);
         } else {
-            throw new Error(result.error || 'Upload fallito');
+            throw new Error(result.error || 'Failed to upload');
         }
     } catch (err) {
-        console.error('Errore upload:', err);
+        console.error('Upload error:', err);
         uploadBtn.textContent = t('upload_error_button');
         showConfirmDialog(t('error_title'), t('upload_error_generic').replace('{error}', err.message), 'confirm', false);
         
@@ -826,7 +807,7 @@ async function uploadFile() {
 audio.addEventListener('waiting', () => {
     if (isPlaying) {
         statusDiv.className = 'status buffering';
-        statusDiv.textContent = '⏳ Buffering...';
+        statusDiv.textContent = 'Buffering...';
     }
 });
 
@@ -843,42 +824,34 @@ audio.addEventListener('error', (e) => {
     statusDiv.className = 'status';
 });
 
-// Inizializza e avvia automaticamente all'apertura della pagina
 window.addEventListener('DOMContentLoaded', function() {
-    console.log('🎵 Inizializzazione radio...');
+    console.log('🎵 Radio initialization...');
     initHLS();
-    // Carica subito allTracks per avere i metadati disponibili
     loadTracksList();
 });
 
-// Carica metadata iniziale
 updateMetadata();
-// Aggiorna coda periodicamente - ridotto da 1s a 5s per migliorare performance
-// Evita aggiornamenti quando le modali sono aperte per non interferire con l'input utente
 setInterval(() => {
     const hasOpenModal = document.querySelector('.auth-modal.active, .settings-modal.active, .change-credentials-modal.active, .confirm-overlay.active');
     if (!hasOpenModal) {
         updateMetadata();
     }
-}, 5000);  // Aggiorna ogni 5 secondi
+}, 5000);  // Update every 5 seconds
 
 // Tracks list management
 let allTracks = [];
 
-// Load tracks when modal is opened (no auto-refresh needed since it's in a modal)
+// Load tracks when modal is opened
 async function loadTracksList() {
     try {
         const response = await fetch(`${API_URL}/tracks`);
         const data = await response.json();
-        // Filtra il file silenzioso dalla lista
         allTracks = (data.tracks || []).filter(track => 
             !track.filename || track.filename !== '_silence_placeholder.aac'
         );
-        
-        // Render sempre, anche se modal chiuso (aggiorna HTML nascosto)
         renderTracksList();
     } catch (err) {
-        console.error('Errore caricamento brani:', err);
+        console.error('Error loading tracks:', err);
         const tracksList = document.getElementById('tracksList');
         if (tracksList) {
             tracksList.innerHTML = 
@@ -936,7 +909,6 @@ async function addTrackToQueue(trackIndex) {
         return;
     }
     
-    // Ottieni il filepath dal brano nell'array
     if (trackIndex < 0 || trackIndex >= allTracks.length) {
         showConfirmDialog(t('error_title'), 'Brano non valido', 'confirm', false);
         return;
@@ -957,26 +929,18 @@ async function addTrackToQueue(trackIndex) {
         const result = await response.json();
 
         if (result.success) {
-            // Aggiorna immediatamente lo stato del brano nella lista locale
+            // Updates infos
             track.in_queue = true;
-            
-            // Aggiorna sempre la visualizzazione
             renderTracksList();
-            
-            // Ricarica la lista dopo un delay per sincronizzare con il server
             setTimeout(() => loadTracksList(), 5000);
-            
-            // Aggiorna metadata per mostrare la coda aggiornata
             updateMetadata();
-            
-            // Mostra notifica
             const meta = result.metadata;
             showConfirmDialog(t('success_title'), t('track_added_to_queue').replace('{artist}', meta.artist).replace('{title}', meta.title), 'success', false);
         } else {
-            throw new Error(result.error || 'Errore aggiunta alla coda');
+            throw new Error(result.error || 'Failed to add to queue');
         }
     } catch (err) {
-        console.error('Errore aggiunta alla coda:', err);
+        console.error('Error adding to queue:', err);
         showConfirmDialog(t('error_title'), t('queue_add_error').replace('{error}', err.message), 'confirm', false);
     }
 }
@@ -987,7 +951,6 @@ async function removeTrack(trackIndex) {
         return;
     }
     
-    // Ottieni il filepath dal brano nell'array
     if (trackIndex < 0 || trackIndex >= allTracks.length) {
         showConfirmDialog(t('error_title'), t('invalid_track_error'), 'confirm', false);
         return;
@@ -996,7 +959,6 @@ async function removeTrack(trackIndex) {
     const track = allTracks[trackIndex];
     const trackName = `${track.artist} - ${track.title}`;
     
-    // Conferma rimozione con dialog personalizzato
     const confirmed = await showConfirmDialog(
         t('confirm_delete_track_title'),
         t('confirm_delete_track_message').replace('{track}', trackName),
@@ -1021,55 +983,44 @@ async function removeTrack(trackIndex) {
         const result = await response.json();
 
         if (result.success) {
-            // Rimuovi immediatamente il brano dalla lista locale per aggiornamento istantaneo
+            // Remove track from local list for instant update
             allTracks.splice(trackIndex, 1);
-            
-            // Aggiorna sempre la visualizzazione (se modal chiuso, aggiorna l'HTML nascosto)
             renderTracksList();
-            
-            // Ricarica la lista dopo un delay per sincronizzare con il server
             setTimeout(() => loadTracksList(), 5000);
-            
-            // Aggiorna metadata per mostrare la coda aggiornata
             updateMetadata();
             
-            // Mostra notifica di successo
             await showConfirmDialog(
                 t('delete_success_title'),
                 t('delete_success_message').replace('{track}', trackName),
                 'confirm',
-                false  // Solo pulsante OK
+                false 
             );
         } else {
-            // Mostra errore specifico dall'API con dialog
             await showConfirmDialog(
                 t('delete_error_title'),
                 result.message || t('delete_error_message'),
                 'warning',
-                false  // Solo pulsante OK
+                false  
             );
         }
     } catch (err) {
-        console.error('Errore rimozione brano:', err);
-        // Mostra errore di connessione con dialog
+        console.error('Error removing track:', err);
         await showConfirmDialog(
             t('connection_error_title'),
             t('connection_error_message').replace('{message}', err.message),
             'warning',
-            false  // Solo pulsante OK
+            false
         );
     }
 }
 
 async function removeFromQueue(trackIndex) {
-    // Controllo autenticazione
+    // Auth check
     if (!currentUser) {
         showAuthModal();
         return;
     }
-    
-    // Ottieni il filepath dal brano nell'array
-    if (trackIndex < 0 || trackIndex >= allTracks.length) {
+        if (trackIndex < 0 || trackIndex >= allTracks.length) {
         showConfirmDialog(t('error_title'), t('invalid_track_error'), 'confirm', false);
         return;
     }
@@ -1077,7 +1028,6 @@ async function removeFromQueue(trackIndex) {
     const track = allTracks[trackIndex];
     const trackName = `${track.artist} - ${track.title}`;
     
-    // Conferma rimozione dalla coda con dialog personalizzato
     const confirmed = await showConfirmDialog(
         t('confirm_remove_from_queue_title'),
         t('confirm_remove_from_queue_message').replace('{track}', trackName),
@@ -1102,25 +1052,17 @@ async function removeFromQueue(trackIndex) {
         const result = await response.json();
 
         if (result.success) {
-            // Aggiorna immediatamente lo stato del brano nella lista locale
+            // Update local track info
             track.in_queue = false;
-            
-            // Aggiorna sempre la visualizzazione
             renderTracksList();
-            
-            // Ricarica la lista dopo un delay per sincronizzare con il server
             setTimeout(() => loadTracksList(), 5000);
-            
-            // Aggiorna metadata per mostrare la coda aggiornata
             updateMetadata();
-            
-            // Mostra notifica
-            showConfirmDialog(t('success_title'), `${trackName} rimosso dalla coda`, 'success', false);
+            showConfirmDialog(t('success_title'), `${trackName} removed from queue`, 'success', false);
         } else {
-            throw new Error(result.message || 'Errore rimozione dalla coda');
+            throw new Error(result.message || 'Error removing from queue');
         }
     } catch (err) {
-        console.error('Errore rimozione dalla coda:', err);
+        console.error('Error removing from queue:', err);
         showConfirmDialog(t('error_title'), t('queue_add_error').replace('{error}', err.message), 'confirm', false);
     }
 }
